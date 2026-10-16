@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>摄像头调试台</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #0f1115;
+    color: #e6e8ee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; }
+  button {
+    min-height: 34px;
+    padding: 6px 12px;
+    border: 1px solid #303641;
+    border-radius: 5px;
+    background: #1d2129;
+    color: #c7cbd4;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+  }
+  button:hover { border-color: #4c5564; color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { border-color: #2f5a8a; background: #1c3a5e; color: #c7dfff; }
+  button.primary:hover { background: #22456f; color: #fff; }
+  button.active { border-color: #2f5a8a; background: #1c3a5e; color: #c7dfff; font-weight: 600; }
+  input, select {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    padding: 7px 10px;
+    border: 1px solid #303641;
+    border-radius: 5px;
+    outline: none;
+    background: #1d2129;
+    color: #e6e8ee;
+  }
+  input:focus, select:focus { border-color: #5aa2f0; }
+  input[type="range"] { height: 20px; padding: 0; accent-color: #5aa2f0; }
+  label { display: block; min-width: 0; color: #a8b0c0; font-size: 12px; }
+  label input, label select { display: block; margin-top: 5px; }
+  code { color: #d6a858; font-family: Consolas, "Cascadia Mono", monospace; overflow-wrap: anywhere; }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: 19px; font-weight: 600; }
+  h2 { font-size: 14px; font-weight: 600; }
+  h3 { color: #a8b0c0; font-size: 13px; font-weight: 600; }
+
+  .console { width: min(100%, 1480px); margin: 0 auto; padding: 20px 22px 36px; }
+  .pageHeader { margin-bottom: 15px; }
+  .headerRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .headerRow h1 { flex: none; white-space: nowrap; }
+
+  .sectionTitle, .panelHeading, .addressHeading {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+
+  .pill {
+    flex: none; padding: 2px 9px; border-radius: 12px;
+    background: #243049; color: #9cc2ee;
+    font-family: Consolas, "Cascadia Mono", monospace; font-size: 11px;
+  }
+  .pill.on { background: #1e3a2a; color: #7fd69a; }
+  .pill.off { background: #3a2320; color: #e2938a; }
+
+  .serverBar { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .serverBar label { display: flex; flex: none; align-items: center; gap: 6px; }
+  .serverBar label input { width: 116px; height: 30px; margin-top: 0; padding: 4px 9px; }
+  .serverBar label input[type="number"] { width: 64px; }
+
+  .serverActions, .inlineActions, .modeButtons, .rangeButtons, .recActions {
+    display: flex; align-items: center; gap: 7px;
+  }
+  .serverActions button { height: 30px; padding: 4px 13px; }
+
+  .serviceList { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .serviceRow {
+    display: flex; height: 30px; align-items: center; gap: 7px;
+    padding: 0 11px; border: 1px solid #272c37; border-radius: 7px;
+    background: #171a21; font-size: 12px;
+  }
+  .serviceRow strong { color: #e6e8ee; white-space: nowrap; }
+  .serviceDot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #4a5262; }
+  .serviceDot.ok { background: #4ec26a; box-shadow: 0 0 0 3px rgba(78,194,106,.14); }
+  .serviceDot.bad { background: #e2574c; box-shadow: 0 0 0 3px rgba(226,87,76,.14); }
+  .serviceDot.pending { background: #e8a33d; animation: pulse 1s ease-in-out infinite; }
+  .serviceText { margin-left: auto; color: #7d8798; text-align: right; }
+  .serviceText.ok { color: #4ec26a; }
+  .serviceText.bad { color: #e2574c; }
+  .serviceText.pending { color: #e8a33d; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .statusBar {
+    display: flex; min-height: 40px; align-items: center; gap: 8px;
+    margin-top: 9px; padding: 8px 12px;
+    border-left: 3px solid #5aa2f0; border-radius: 4px;
+    background: rgba(90,162,240,.07); color: #a8b0c0; font-size: 12px;
+  }
+  .statusBar strong { color: #e6e8ee; font-weight: 600; }
+  .statusBar.ok { border-color: #4ec26a; background: rgba(78,194,106,.07); }
+  .statusBar.error { border-color: #e2574c; background: rgba(226,87,76,.07); }
+  .statusBar.warn { border-color: #e8a33d; background: rgba(232,163,61,.07); }
+
+  .mainGrid { display: grid; grid-template-columns: minmax(0,1fr) 360px; align-items: stretch; gap: 15px; }
+  .playerColumn { min-width: 0; }
+  .player {
+    position: relative; overflow: hidden; width: 100%;
+    aspect-ratio: 16 / 9; border: 1px solid #272c37; border-radius: 7px; background: #000;
+  }
+  .player video { display: block; width: 100%; height: 100%; background: #000; object-fit: contain; }
+  .placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 5px;
+    padding: 20px; color: #a8b0c0; pointer-events: none; text-align: center;
+  }
+  .placeholder small { color: #6f7889; font-size: 12px; }
+
+  .addressBar, .ptzPanel, .configPanel, .recordPanel, .logPanel {
+    border: 1px solid #272c37; border-radius: 7px; background: #171a21;
+  }
+  .addressBar { margin-bottom: 10px; padding: 10px 12px; }
+  .addressHeading { justify-content: flex-start; margin-bottom: 7px; color: #a8b0c0; font-size: 12px; }
+  .streamHint { margin-left: auto; color: #7d8798; }
+  .addressRow { display: flex; gap: 7px; }
+  .addressRow input { flex: 1; min-width: 100px; font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; }
+
+  .ptzPanel { display: flex; flex-direction: column; padding: 13px; }
+  .panelSection { margin-top: 12px; padding-top: 12px; border-top: 1px solid #272c37; }
+  .panelSection .subSectionTitle { flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+  .directionSection { display: flex; flex: 1 1 auto; flex-direction: column; }
+  .padWrap { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: center; }
+  .modeLine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .modeLine h3 { flex: none; }
+  .modeLine .modeButtons button { padding: 4px 10px; font-size: 12px; }
+  .streamField { display: flex; flex: none; align-items: center; gap: 6px; white-space: nowrap; }
+  .streamField select { width: auto; height: 30px; margin-top: 0; padding: 3px 8px; font-size: 12px; }
+  .panelHeading { margin-bottom: 10px; }
+
+  .ptzPad {
+    display: grid; width: 100%; max-width: 246px;
+    grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px auto 8px;
+  }
+  .ptzPad button {
+    display: flex; height: 48px; align-items: center; justify-content: center;
+    padding: 0; color: #c9d5e4; font-size: 20px;
+    touch-action: none; user-select: none;
+  }
+  .ptzPad button:active { border-color: #3f6fa0; background: #22456f; color: #fff; }
+  .ptzPad .stopButton { border-color: #4a2c2c; background: #2a2020; color: #e2a09a; font-size: 14px; }
+  .zoomRow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .zoomRow button { height: 38px; touch-action: none; user-select: none; }
+
+  .sliderRow { margin-top: 12px; }
+  .sliderRow label { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .sliderRow label b { color: #c7cbd4; font-family: Consolas, "Cascadia Mono", monospace; font-weight: 500; }
+  .hintLine { margin-top: 8px; color: #7d8798; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+
+  .configPanel, .recordPanel, .logPanel { margin-top: 14px; padding: 14px; }
+  .modeButtons button { min-height: 30px; padding: 4px 13px; }
+
+  .deviceGrid {
+    display: grid;
+    grid-template-columns: 132px minmax(140px,1.5fr) 92px 92px 92px minmax(110px,1fr) minmax(130px,1fr);
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .channelRow { display: flex; align-items: center; gap: 6px; }
+  .channelRow > span { flex: none; color: #a8b0c0; font-size: 12px; }
+  .channelRow input { width: 62px; height: 32px; text-align: center; }
+  .channelRow button { width: 32px; min-height: 32px; padding: 0; font-size: 16px; line-height: 1; }
+
+  .timeRow {
+    display: grid; grid-template-columns: minmax(190px,1fr) minmax(190px,1fr) auto;
+    align-items: end; gap: 10px; margin-top: 12px;
+  }
+  .timeRow input { font-family: inherit; font-size: 12px; }
+  input[type="datetime-local"] { cursor: pointer; }
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    opacity: .75; cursor: pointer; filter: invert(.7);
+  }
+  input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+  .rangeButtons button { min-height: 36px; padding: 5px 9px; font-size: 12px; }
+  .recActions { flex-wrap: wrap; margin-top: 12px; }
+
+  .progressWrap { display: none; align-items: center; gap: 10px; margin-top: 12px; }
+  .progressWrap.show { display: flex; }
+  .progressBar { flex: 1; height: 8px; border-radius: 4px; background: #1d2129; overflow: hidden; }
+  .progressFill { height: 100%; width: 0; background: #5aa2f0; transition: width .3s ease; }
+  .progressText { flex: none; color: #a8b0c0; font-size: 12px; font-family: Consolas, "Cascadia Mono", monospace; }
+
+  .resultBox { margin-top: 10px; color: #a8b0c0; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+  .resultBox .ok { color: #4ec26a; }
+  .resultBox .bad { color: #e2574c; }
+
+  .tableScroll { max-height: 260px; overflow: auto; margin-top: 10px; }
+  .tableScroll.hide { display: none; }
+  table { width: 100%; border-collapse: collapse; color: #c7cbd4; font-size: 12px; text-align: left; }
+  table th, table td { padding: 8px 10px; border-bottom: 1px solid #272c37; }
+  table th { position: sticky; top: 0; background: #1d2129; color: #a8b0c0; font-weight: 500; }
+  .tableActions { display: flex; gap: 6px; }
+  .tableActions button { min-height: 28px; padding: 3px 10px; font-size: 11px; }
+  .listHint { color: #7d8798; font-size: 12px; }
+
+  .logPanel pre {
+    max-height: 190px; overflow: auto; margin: 10px 0 0; padding: 10px 12px;
+    border: 1px solid #272c37; border-radius: 5px; background: #111318;
+    color: #a8b0c0; font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .logPanel pre .success { color: #4ec26a; }
+  .logPanel pre .warning { color: #e8a33d; }
+  .logPanel pre .error { color: #e2574c; }
+  .logPanel pre .detail { color: #a8b0c0; }
+
+  @media (max-width: 1180px) { .deviceGrid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+  @media (max-width: 940px) { .mainGrid { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) {
+    .console { padding: 14px 12px 28px; }
+    .serverBar { flex: 1 1 100%; }
+    .timeRow { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .headerRow { align-items: stretch; flex-direction: column; }
+    .sectionTitle { align-items: flex-start; flex-direction: column; }
+    .addressRow { flex-wrap: wrap; }
+    .addressRow input { width: 100%; flex-basis: 100%; }
+    .deviceGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .ptzPad { margin: 8px auto; }
+  }
+</style>
+</head>
+<body>
+<div class="console">
+  <header class="pageHeader">
+    <div class="headerRow">
+      <h1>摄像头调试台</h1>
+      <div class="serverBar">
+        <label><span>服务地址</span><input id="svcHost" spellcheck="false" placeholder="127.0.0.1"></label>
+        <label><span>WebRTC</span><input id="svcWebPort" type="number" min="1" max="65535" value="8000"></label>
+        <label><span>PTZ</span><input id="svcPtzPort" type="number" min="1" max="65535" value="3000"></label>
+        <label><span>下载</span><input id="svcRecPort" type="number" min="1" max="65535" value="3001"></label>
+        <div class="serverActions">
+          <button class="primary" type="button" id="btnApply">应用并检测</button>
+          <button type="button" id="btnRetest">重新检测</button>
+        </div>
+      </div>
+      <div class="serviceList">
+        <div class="serviceRow"><span class="serviceDot" id="dotWeb"></span><strong>WebRTC</strong><span class="serviceText" id="textWeb">未检测</span></div>
+        <div class="serviceRow"><span class="serviceDot" id="dotPtz"></span><strong>ONVIF-PTZ</strong><span class="serviceText" id="textPtz">未检测</span></div>
+        <div class="serviceRow"><span class="serviceDot" id="dotRec"></span><strong>录像下载</strong><span class="serviceText" id="textRec">未检测</span></div>
+      </div>
+    </div>
+    <div class="statusBar info" id="statusBar">
+      <strong id="statusTitle">正在初始化</strong>
+      <span id="statusMsg"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="mainGrid">
+      <div class="playerColumn">
+        <div class="addressBar">
+          <div class="addressHeading">
+            <span>播放地址</span>
+            <span class="pill" id="modePill">实时</span>
+            <span class="streamHint" id="streamHint"></span>
+          </div>
+          <div class="addressRow">
+            <input id="rtspUrl" spellcheck="false" placeholder="填写设备信息自动生成，也可直接粘贴 RTSP 地址">
+            <button class="primary" type="button" id="btnConnect">连接</button>
+            <button type="button" id="btnDisconnect">断开</button>
+            <button type="button" id="btnReconnect">重连</button>
+          </div>
+        </div>
+        <div class="player">
+          <video id="videoEl" controls autoplay muted playsinline></video>
+          <div class="placeholder" id="placeholder">
+            <span id="phTitle">未连接</span>
+            <small id="phMsg">媒体流尚未到达</small>
+          </div>
+        </div>
+      </div>
+
+      <aside class="ptzPanel">
+        <div class="panelHeading">
+          <h2>控制面板</h2>
+          <span class="pill off" id="ptzPill">服务状态</span>
+        </div>
+
+        <div class="channelRow">
+          <span>通道号</span>
+          <button type="button" id="chMinus" aria-label="上一通道">&#8722;</button>
+          <input id="devChannel" type="number" min="1" max="999" value="1">
+          <button type="button" id="chPlus" aria-label="下一通道">&#43;</button>
+        </div>
+
+        <div class="panelSection">
+          <div class="modeLine">
+            <h3>播放模式</h3>
+            <div class="modeButtons" id="modeButtons">
+              <button class="active" type="button" data-mode="live">实时预览</button>
+              <button type="button" data-mode="playback">录像回放</button>
+            </div>
+            <label class="streamField">码流
+              <select id="devStream">
+                <option value="0">主码流</option>
+                <option value="1">子码流</option>
+              </select>
+            </label>
+          </div>
+          <div class="timeRow hide" id="pbTimeRow" style="display:none">
+            <label>开始时间<input id="pbStart" type="datetime-local"></label>
+            <label>结束时间<input id="pbEnd" type="datetime-local"></label>
+            <div class="rangeButtons" id="pbRangeButtons">
+              <button type="button" data-range="today">今天</button>
+              <button type="button" data-range="yesterday">昨天</button>
+              <button type="button" data-range="hour">最近1小时</button>
+            </div>
+          </div>
+          <p class="hintLine" id="pbNote"></p>
+        </div>
+
+        <div class="panelSection">
+          <div class="sectionTitle subSectionTitle">
+            <h3>云台参数</h3>
+            <button type="button" id="btnTestPtz">检测云台服务</button>
+          </div>
+          <p class="hintLine" id="ptzAddrHint">ONVIF 地址（待填写设备 IP）</p>
+          <div class="sliderRow">
+            <label><span>移动速度</span><b id="speedVal">0.50</b></label>
+            <input id="ptzSpeed" type="range" min="0.1" max="1" step="0.05" value="0.5">
+          </div>
+          <div class="sliderRow">
+            <label><span>变倍速度</span><b id="zoomVal">0.50</b></label>
+            <input id="zoomSpeed" type="range" min="0.1" max="1" step="0.05" value="0.5">
+          </div>
+        </div>
+
+        <div class="panelSection directionSection" id="dirSection">
+          <div class="sectionTitle subSectionTitle"><h3>方向（按住持续移动，Esc 停止）</h3></div>
+          <div class="padWrap">
+            <div class="ptzPad" id="ptzPad">
+              <button type="button" data-vec="-1,1,0" aria-label="左上">&#8598;</button>
+              <button type="button" data-vec="0,1,0" aria-label="上">&#8593;</button>
+              <button type="button" data-vec="1,1,0" aria-label="右上">&#8599;</button>
+              <button type="button" data-vec="-1,0,0" aria-label="左">&#8592;</button>
+              <button class="stopButton" type="button" id="btnStopPtz" aria-label="停止">&#9632;</button>
+              <button type="button" data-vec="1,0,0" aria-label="右">&#8594;</button>
+              <button type="button" data-vec="-1,-1,0" aria-label="左下">&#8601;</button>
+              <button type="button" data-vec="0,-1,0" aria-label="下">&#8595;</button>
+              <button type="button" data-vec="1,-1,0" aria-label="右下">&#8600;</button>
+            </div>
+            <div class="zoomRow">
+              <button type="button" data-zoom="1">&#65291; 变倍</button>
+              <button type="button" data-zoom="-1">&#65293; 变倍</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="configPanel">
+      <div class="sectionTitle">
+        <h2>设备参数</h2>
+      </div>
+      <div class="deviceGrid">
+        <label>品牌
+          <select id="devBrand">
+            <option value="hik">海康</option>
+            <option value="dahua">大华</option>
+            <option value="uniview">宇视</option>
+          </select>
+        </label>
+        <label>设备 IP<input id="devIp" spellcheck="false" placeholder="192.168.110.11"></label>
+        <label>RTSP 端口<input id="devRtspPort" type="number" min="1" max="65535" value="554"></label>
+        <label>ONVIF 端口<input id="devOnvifPort" type="number" min="1" max="65535" value="80"></label>
+        <label>ISAPI 端口<input id="devIsapiPort" type="number" min="1" max="65535" value="80"></label>
+        <label>用户名<input id="devUser" spellcheck="false" autocomplete="off" value="admin"></label>
+        <label>密码<input id="devPass" type="password" autocomplete="new-password"></label>
+      </div>
+      <p class="hintLine" id="brandHint"></p>
+    </section>
+
+    <section class="recordPanel">
+      <div class="sectionTitle">
+        <h2>录像下载</h2>
+        <div class="inlineActions">
+          <span class="listHint" id="recHint">未查询</span>
+          <button type="button" id="btnRefreshTasks">刷新任务</button>
+        </div>
+      </div>
+
+      <div class="timeRow">
+        <label>开始时间<input id="recStart" type="datetime-local"></label>
+        <label>结束时间<input id="recEnd" type="datetime-local"></label>
+        <div class="rangeButtons" id="recRangeButtons">
+          <button type="button" data-recrange="hour">最近1小时</button>
+          <button type="button" data-recrange="today">今天</button>
+          <button type="button" data-recrange="yesterday">昨天</button>
+        </div>
+      </div>
+
+      <div class="recActions">
+        <button class="primary" type="button" id="btnSearch">&#9312; 查询录像</button>
+        <button class="primary" type="button" id="btnDownload">&#9313; 开始下载</button>
+        <button type="button" id="btnSyncTime">用回放时间填充</button>
+        <button type="button" id="btnDiag">设备自检</button>
+      </div>
+
+      <div class="progressWrap" id="progressWrap">
+        <div class="progressBar"><div class="progressFill" id="progressFill"></div></div>
+        <span class="progressText" id="progressText">0%</span>
+      </div>
+
+      <div class="resultBox" id="searchResult"></div>
+
+      <div class="tableScroll hide" id="taskTableWrap">
+        <table>
+          <thead>
+            <tr><th>任务</th><th>状态</th><th>文件</th><th>大小</th><th>操作</th></tr>
+          </thead>
+          <tbody id="taskTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="logPanel">
+      <div class="sectionTitle">
+        <h2>运行日志</h2>
+        <button type="button" id="btnClearLog">清空</button>
+      </div>
+      <pre id="logOutput"></pre>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ============================================================ 工具
+
+  const $ = (id) => document.getElementById(id);
+
+  function pad2(v) { return String(v).padStart(2, '0'); }
+
+  function toLocalInput(date) {
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate()) +
+      'T' + pad2(date.getHours()) + ':' + pad2(date.getMinutes());
+  }
+
+  /** 'YYYY-MM-DDTHH:mm' -> 'YYYY-MM-DD HH:mm:ss' */
+  function localInputToStr(v) {
+    if (!v) return '';
+    return v.replace('T', ' ') + (v.length === 16 ? ':00' : '');
+  }
+
+  let logSeq = 0;
+  function log(message, type) {
+    const pre = $('logOutput');
+    const now = new Date();
+    logSeq += 1;
+    const span = document.createElement('span');
+    span.className = type || 'detail';
+    span.textContent = '[' + now.toTimeString().slice(0, 8) + '] ' + message + '\n';
+    pre.appendChild(span);
+    while (pre.childNodes.length > 200) pre.removeChild(pre.firstChild);
+    pre.scrollTop = pre.scrollHeight;
+  }
+
+  function setStatus(title, message, kind) {
+    const bar = $('statusBar');
+    bar.className = 'statusBar ' + (kind || 'info');
+    $('statusTitle').textContent = title;
+    $('statusMsg').textContent = message || '';
+  }
+
+  function fetchWithTimeout(url, options, timeout) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout || 8000);
+    const opts = Object.assign({ cache: 'no-store' }, options || {}, { signal: controller.signal });
+    return fetch(url, opts).then(
+      (r) => { clearTimeout(timer); return r; },
+      (e) => {
+        clearTimeout(timer);
+        if (e && e.name === 'AbortError') throw new Error('请求超时');
+        throw e;
+      }
+    );
+  }
+
+  function loadScript(url) {
+    return new Promise((resolve) => {
+      const s = document.createElement('script');
+      let done = false;
+      const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+      s.src = url;
+      s.onload = () => finish(true);
+      s.onerror = () => finish(false);
+      document.head.appendChild(s);
+      setTimeout(() => finish(false), 8000);
+    });
+  }
+
+  function maskUrl(url) {
+    const p = url.indexOf('://') + 3;
+    const at = url.indexOf('@', p);
+    if (p < 3 || at < 0) return url;
+    return url.slice(0, p) + '***@' + url.slice(at + 1);
+  }
+
+  // ============================================================ 服务地址
+
+  function host() {
+    return ($('svcHost').value || '').trim() || '127.0.0.1';
+  }
+  function webstreamBase() { return 'http://' + host() + ':' + (Number($('svcWebPort').value) || 8000); }
+  function ptzBase()       { return 'http://' + host() + ':' + (Number($('svcPtzPort').value) || 3000); }
+  function recBase()       { return 'http://' + host() + ':' + (Number($('svcRecPort').value) || 3001); }
+
+  function setService(kind, state, text) {
+    const dot = $('dot' + kind);
+    const txt = $('text' + kind);
+    dot.className = 'serviceDot ' + state;
+    txt.className = 'serviceText ' + state;
+    txt.textContent = text;
+  }
+
+  async function checkWebstream() {
+    try {
+      const r = await fetchWithTimeout(webstreamBase() + '/api/version', null, 5000);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const t = (await r.text()).trim().split(' ')[0];
+      return { ok: true, info: t || '可用' };
+    } catch (e) { return { ok: false, error: e.message || '连接失败' }; }
+  }
+
+  async function checkPtz() {
+    try {
+      const r = await fetchWithTimeout(ptzBase() + '/health', null, 5000);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      return { ok: true, info: j.mode || '可用' };
+    } catch (e) { return { ok: false, error: e.message || '连接失败' }; }
+  }
+
+  async function checkRecord() {
+    try {
+      const r = await fetchWithTimeout(recBase() + '/health', null, 5000);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      return { ok: true, info: j.ffmpegAvailable ? 'ffmpeg 就绪' : '缺少 ffmpeg', warn: !j.ffmpegAvailable };
+    } catch (e) { return { ok: false, error: e.message || '连接失败' }; }
+  }
+
+  async function testServices() {
+    setService('Web', 'pending', '检测中');
+    setService('Ptz', 'pending', '检测中');
+    setService('Rec', 'pending', '检测中');
+    setStatus('正在检测服务', webstreamBase() + ' / ' + ptzBase() + ' / ' + recBase());
+
+    const t0 = Date.now();
+    const [web, ptz, rec] = await Promise.all([checkWebstream(), checkPtz(), checkRecord()]);
+
+    setService('Web', web.ok ? 'ok' : 'bad', web.ok ? '可用 · ' + web.info : '失败 · ' + web.error);
+    setService('Ptz', ptz.ok ? 'ok' : 'bad', ptz.ok ? '可用 · ' + ptz.info : '失败 · ' + ptz.error);
+    setService('Rec', rec.ok ? (rec.warn ? 'pending' : 'ok') : 'bad',
+      rec.ok ? rec.info : '失败 · ' + rec.error);
+
+    const failed = [];
+    if (!web.ok) failed.push('WebRTC');
+    if (!ptz.ok) failed.push('ONVIF-PTZ');
+    if (!rec.ok) failed.push('录像下载');
+
+    if (!failed.length) {
+      setStatus('服务连接正常', '检测耗时 ' + (Date.now() - t0) + ' ms', 'ok');
+      log('三个服务连接正常', 'success');
+    } else {
+      setStatus('部分服务不可用', failed.join('、') + ' 检测失败', 'error');
+      log('服务检测失败：' + failed.join('、'), 'error');
+    }
+
+    $('ptzPill').className = 'pill ' + (ptz.ok ? 'on' : 'off');
+    $('ptzPill').textContent = ptz.ok ? '服务可用' : '服务不可用';
+
+    if (rec.ok && !rec.warn) {
+      $('recHint').textContent = '服务就绪';
+    } else if (rec.ok) {
+      $('recHint').textContent = '服务可用，但 ffmpeg 缺失';
+    }
+    return { web, ptz, rec };
+  }
+
+  // ============================================================ 设备参数
+
+  const BRANDS = {
+    hik: {
+      label: '海康',
+      hint: '实时 /Streaming/Channels/{通道两位}{01主码流|02子码流}；回放 /Streaming/tracks/{通道×100+1}，时间按 UTC 编码。' +
+        '　ISAPI 与 ONVIF 共用同一个 HTTP 端口（出厂默认 80），所以「ISAPI 端口」填成和 ONVIF 一致即可。',
+    },
+    dahua: {
+      label: '大华',
+      hint: '实时 /cam/realmonitor?channel={通道}&subtype={0主码流|1子码流}；回放 /cam/playback。' +
+        '　注意：录像下载走海康 ISAPI 接口，大华设备暂不支持。',
+    },
+    uniview: {
+      label: '宇视',
+      hint: '实时 /unicast/ch{通道}/s{0主码流|1子码流}/live；回放使用 UNIX 秒时间戳。' +
+        '　注意：录像下载走海康 ISAPI 接口，宇视设备暂不支持。',
+    },
+  };
+
+  let brand = 'hik';
+  let mode = 'live';
+  let isapiManual = false;   // ISAPI 端口是否被手动改过（未改则跟随 ONVIF 端口）
+
+  function device() {
+    return {
+      ip: ($('devIp').value || '').trim(),
+      username: ($('devUser').value || '').trim(),
+      password: $('devPass').value || '',
+      channel: Math.max(1, parseInt($('devChannel').value, 10) || 1),
+      subStream: $('devStream').value === '1',
+      rtspPort: Math.min(65535, Math.max(1, parseInt($('devRtspPort').value, 10) || 554)),
+      onvifPort: Math.min(65535, Math.max(1, parseInt($('devOnvifPort').value, 10) || 80)),
+      isapiPort: Math.min(65535, Math.max(1, parseInt($('devIsapiPort').value, 10) || 80)),
+    };
+  }
+
+  function formatHikTime(value) {
+    const d = new Date(value);
+    return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) +
+      't' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'z';
+  }
+
+  function formatDahuaTime(value) {
+    const d = new Date(value);
+    return d.getFullYear() + '_' + pad2(d.getMonth() + 1) + '_' + pad2(d.getDate()) + '_' +
+      pad2(d.getHours()) + '_' + pad2(d.getMinutes()) + '_' + pad2(d.getSeconds());
+  }
+
+  function buildRtspUrl(shouldLog) {
+    const d = device();
+    $('pbNote').textContent = '';
+    if (!d.ip) { $('rtspUrl').value = ''; return ''; }
+
+    const auth = d.username
+      ? encodeURIComponent(d.username) + ':' + encodeURIComponent(d.password) + '@'
+      : '';
+    const prefix = 'rtsp://' + auth + d.ip + ':' + d.rtspPort;
+    const ch = d.channel;
+    const sub = d.subStream ? '1' : '0';
+    let url = '';
+
+    if (mode === 'playback') {
+      const startRaw = $('pbStart').value;
+      const endRaw = $('pbEnd').value;
+      const start = new Date(startRaw).getTime();
+      const end = new Date(endRaw).getTime();
+      if (!startRaw || !endRaw || isNaN(start) || isNaN(end)) {
+        $('pbNote').textContent = '请选择录像开始和结束时间。';
+        $('rtspUrl').value = '';
+        return '';
+      }
+      if (end <= start) {
+        $('pbNote').textContent = '结束时间必须晚于开始时间。';
+        $('rtspUrl').value = '';
+        return '';
+      }
+      if (brand === 'hik') {
+        url = prefix + '/Streaming/tracks/' + (ch * 100 + 1) +
+          '?starttime=' + formatHikTime(start) + '&endtime=' + formatHikTime(end);
+        $('pbNote').textContent = '海康录像时间以 UTC 编码；当前通道 ' + ch + '。';
+      } else if (brand === 'dahua') {
+        url = prefix + '/cam/playback?channel=' + ch + '&subtype=' + sub +
+          '&starttime=' + formatDahuaTime(start) + '&endtime=' + formatDahuaTime(end);
+        $('pbNote').textContent = '大华录像时间按设备本地时间编码。';
+      } else {
+        url = prefix + '/c' + ch + '/b' + Math.floor(start / 1000) +
+          '/e' + Math.floor(end / 1000) + '/replay/';
+        $('pbNote').textContent = '宇视录像时间使用 UNIX 秒时间戳。';
+      }
+    } else if (brand === 'hik') {
+      url = prefix + '/Streaming/Channels/' + String(ch).padStart(2, '0') + (d.subStream ? '02' : '01');
+    } else if (brand === 'dahua') {
+      url = prefix + '/cam/realmonitor?channel=' + ch + '&subtype=' + sub;
+    } else {
+      url = prefix + '/unicast/ch' + ch + '/s' + sub + '/live';
+    }
+
+    $('rtspUrl').value = url;
+    if (shouldLog) log('RTSP 地址已生成：' + maskUrl(url), 'detail');
+    return url;
+  }
+
+  function syncPtzHint() {
+    const d = device();
+    if (!d.ip) { $('ptzAddrHint').textContent = 'ONVIF 地址（待填写设备 IP）'; return; }
+    const port = d.onvifPort;
+    $('ptzAddrHint').textContent =
+      'ONVIF 地址 http://' + d.ip + (port === 80 ? '' : ':' + port) + '/onvif/device_service';
+  }
+
+  function fillRange(range, target) {
+    const now = new Date();
+    let start;
+    let end;
+    if (range === 'today') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      end = now;
+    } else if (range === 'yesterday') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 0);
+    } else {
+      end = now;
+      start = new Date(now.getTime() - 60 * 60 * 1000);
+    }
+    if (target === 'rec') {
+      $('recStart').value = toLocalInput(start);
+      $('recEnd').value = toLocalInput(end);
+    } else {
+      $('pbStart').value = toLocalInput(start);
+      $('pbEnd').value = toLocalInput(end);
+      if (mode === 'playback') buildRtspUrl(false);
+    }
+  }
+
+  // ============================================================ 播放
+
+  let streamer = null;
+  let sdkLoading = null;
+  let connectTimeout = null;
+  let streamState = 'idle';
+
+  function setStreamState(s) {
+    streamState = s;
+    const hint = $('streamHint');
+    const ph = $('placeholder');
+    if (s === 'connecting') {
+      hint.textContent = '连接中';
+      $('phTitle').textContent = '正在连接';
+      $('phMsg').textContent = '等待 WebRTC 媒体流';
+      ph.style.display = 'flex';
+    } else if (s === 'playing') {
+      hint.textContent = '播放中';
+      ph.style.display = 'none';
+    } else if (s === 'error') {
+      hint.textContent = '连接异常';
+      $('phTitle').textContent = '连接失败';
+      $('phMsg').textContent = '播放器未收到有效媒体流';
+      ph.style.display = 'flex';
+    } else {
+      hint.textContent = '';
+      $('phTitle').textContent = '未连接';
+      $('phMsg').textContent = '媒体流尚未到达';
+      ph.style.display = 'flex';
+    }
+  }
+
+  function ensureSdk() {
+    if (window.WebRtcStreamer) return Promise.resolve(true);
+    if (sdkLoading) return sdkLoading;
+    const base = webstreamBase();
+    log('正在加载播放器 SDK：' + base, 'detail');
+    sdkLoading = loadScript(base + '/libs/adapter.min.js')
+      .then((a) => loadScript(base + '/webrtcconfig.js').then(() => a))
+      .then(() => loadScript(base + '/webrtcstreamer.js'))
+      .then((ok) => {
+        if (!ok || !window.WebRtcStreamer) {
+          log('播放器 SDK 加载失败，请确认 WebRTC 服务地址正确', 'error');
+          sdkLoading = null;
+          return false;
+        }
+        log('播放器 SDK 加载完成', 'success');
+        return true;
+      })
+      .catch(() => { sdkLoading = null; return false; });
+    return sdkLoading;
+  }
+
+  async function connect() {
+    const url = ($('rtspUrl').value || '').trim();
+    if (!url) {
+      log('播放地址为空，请填写设备信息或直接粘贴 RTSP 地址', 'error');
+      setStatus('无法连接', '播放地址为空', 'error');
+      return;
+    }
+    disconnect(true);
+    const ready = await ensureSdk();
+    if (!ready) {
+      setStreamState('error');
+      return;
+    }
+    const cfg = window.webrtcConfig || {};
+    const options = cfg.options || 'rtptransport=tcp&timeout=60';
+    try {
+      streamer = new window.WebRtcStreamer('videoEl', webstreamBase());
+      streamer.connect(url, null, options, undefined, cfg.codec || undefined);
+      setStreamState('connecting');
+      log('开始连接' + (mode === 'playback' ? '录像回放' : '实时视频') + '：' + maskUrl(url), 'detail');
+      connectTimeout = setTimeout(() => {
+        const v = $('videoEl');
+        if (streamState === 'connecting' && v && v.readyState === 0) {
+          setStreamState('error');
+          log('等待媒体流超时，请检查设备地址、通道与编码（H.265 浏览器可能不支持）', 'warning');
+        }
+      }, 12000);
+    } catch (e) {
+      setStreamState('error');
+      log('播放器连接失败：' + (e.message || e), 'error');
+    }
+  }
+
+  function disconnect(silent) {
+    if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
+    if (streamer) {
+      try { streamer.disconnect(); } catch (e) { log('断开播放器异常：' + (e.message || e), 'warning'); }
+      streamer = null;
+    }
+    const v = $('videoEl');
+    if (v) { v.srcObject = null; v.removeAttribute('src'); v.load(); }
+    const had = streamState !== 'idle';
+    setStreamState('idle');
+    if (!silent && had) log('播放已断开', 'detail');
+  }
+
+  // ============================================================ 云台
+
+  let ptzTimer = null;
+  let ptzMoving = false;
+  let ptzActivePayload = null;
+  let ptzLastError = '';
+
+  function ptzPayload() {
+    const d = device();
+    if (!d.ip) { log('云台控制需要先填写设备 IP', 'error'); return null; }
+    if (!d.username) { log('云台控制需要用户名', 'error'); return null; }
+    const port = d.onvifPort;
+    return {
+      xaddr: 'http://' + d.ip + (port === 80 ? '' : ':' + port) + '/onvif/device_service',
+      userName: d.username,
+      password: d.password,
+    };
+  }
+
+  async function sendPtz(path, payload) {
+    const r = await fetchWithTimeout(ptzBase() + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, 10000);
+    let j = {};
+    try { j = await r.json(); } catch (e) { j = { success: false, error: 'ONVIF 服务返回无效响应' }; }
+    if (!r.ok || !j.success) throw new Error(j.error || ('HTTP ' + r.status));
+    return j;
+  }
+
+  async function sendPtzMove(vector) {
+    const basePayload = ptzActivePayload || ptzPayload();
+    if (!basePayload) return;
+    const speed = Number($('ptzSpeed').value);
+    const payload = Object.assign({}, basePayload, {
+      x: vector[0] * speed,
+      y: vector[1] * speed,
+      zoom: vector[2],
+    });
+    try {
+      await sendPtz('/ptz-control', payload);
+      if (ptzLastError) log('云台控制已恢复', 'success');
+      ptzLastError = '';
+      $('ptzPill').className = 'pill on';
+      $('ptzPill').textContent = '控制正常';
+    } catch (e) {
+      if (ptzLastError !== e.message) {
+        ptzLastError = e.message;
+        log('云台指令失败：' + e.message, 'error');
+      }
+      $('ptzPill').className = 'pill off';
+      $('ptzPill').textContent = '控制异常';
+      stopPtz(false, true);
+    }
+  }
+
+  function startPtz(vector) {
+    const payload = ptzPayload();
+    if (!payload) return;
+    stopPtz(false, true);
+    ptzActivePayload = payload;
+    ptzMoving = true;
+    sendPtzMove(vector);
+    ptzTimer = setInterval(() => sendPtzMove(vector), 3000);
+  }
+
+  function stopPtz(force, silent) {
+    if (ptzTimer) { clearInterval(ptzTimer); ptzTimer = null; }
+    if (!ptzMoving && !force) return;
+    ptzMoving = false;
+    const payload = ptzActivePayload || ptzPayload();
+    ptzActivePayload = null;
+    if (!payload) return;
+    sendPtz('/ptz-stop', payload)
+      .then(() => { if (!silent && force) log('云台已停止', 'detail'); })
+      .catch((e) => { if (!silent) log('云台停止失败：' + e.message, 'error'); });
+  }
+
+  function isEditable(t) {
+    if (!t) return false;
+    const tag = (t.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable;
+  }
+
+  // ============================================================ 录像下载
+
+  let currentTaskId = null;
+  let progressTimer = null;
+
+  function recPayload() {
+    const d = device();
+    const start = localInputToStr($('recStart').value);
+    const end = localInputToStr($('recEnd').value);
+    if (!d.ip) throw new Error('请先填写设备 IP');
+    if (!d.username) throw new Error('请填写用户名');
+    if (!start || !end) throw new Error('请选择开始和结束时间');
+    if (end <= start) throw new Error('结束时间必须晚于开始时间');
+    return {
+      cameraIp: d.ip,
+      isapiPort: d.isapiPort,
+      userName: d.username,
+      password: d.password,
+      channel: d.channel,
+      stream: d.subStream ? 'sub' : 'main',
+      start: start,
+      end: end,
+      tz: 8,
+    };
+  }
+
+  function setProgress(pct, text) {
+    $('progressWrap').classList.add('show');
+    $('progressFill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+    $('progressText').textContent = pct + '%  ' + (text || '');
+  }
+
+  function hideProgress() {
+    $('progressWrap').classList.remove('show');
+    $('progressFill').style.width = '0%';
+    $('progressText').textContent = '0%';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function fmtMB(mb) {
+    if (!mb) return '—';
+    return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+  }
+
+  /**
+   * 设备自检：查型号 + 存储介质。
+   * 直接回答"为什么查不到录像" —— 十有八九是设备本身没有存储。
+   */
+  async function diagnoseDevice() {
+    const d = device();
+    if (!d.ip) {
+      $('searchResult').innerHTML = '<span class="bad">请先填写设备 IP</span>';
+      log('自检失败：请先填写设备 IP', 'error');
+      return;
+    }
+    const body = {
+      cameraIp: d.ip,
+      isapiPort: d.isapiPort,
+      userName: d.username,
+      password: d.password,
+    };
+    $('searchResult').innerHTML = '正在自检 ' + esc(d.ip) + ' ...';
+    $('recHint').textContent = '自检中';
+    log('开始设备自检：' + d.ip, 'detail');
+
+    const out = [];
+
+    // ① 型号
+    try {
+      const r = await fetchWithTimeout(recBase() + '/deviceinfo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 15000);
+      const j = await r.json();
+      if (j.success) {
+        out.push('<span class="ok">设备型号</span>　' + esc(j.model || '未知') +
+          '　固件 ' + esc(j.firmware || '未知'));
+        log('自检：型号 ' + (j.model || '未知'), 'success');
+      } else {
+        out.push('<span class="bad">设备信息查询失败</span>　' + esc(j.error));
+        log('自检：设备信息失败 — ' + j.error, 'error');
+      }
+    } catch (e) {
+      out.push('<span class="bad">设备信息查询失败</span>　' + esc(e.message));
+      log('自检：设备信息失败 — ' + e.message, 'error');
+    }
+
+    // ② 存储介质
+    try {
+      const r = await fetchWithTimeout(recBase() + '/storage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 15000);
+      const j = await r.json();
+      if (j.success) {
+        if (j.count) {
+          const lines = j.volumes.map((v) =>
+            '  · ' + esc(v.type) + ' #' + esc(v.id || '?') + '　' + esc(v.name || '') +
+            '　状态 ' + esc(v.status || '?') +
+            (v.capacity ? '　容量 ' + fmtMB(v.capacity) + ' / 剩余 ' + fmtMB(v.freeSpace) : '')
+          ).join('\n');
+          out.push('<span class="ok">存储介质</span>　' + j.count + ' 个\n' + lines);
+        } else {
+          out.push('<span class="bad">存储介质</span>　一个都没有');
+        }
+        if (j.conclusion) out.push('<span class="ok">结论</span>　' + esc(j.conclusion));
+        log('自检：' + j.conclusion, j.count ? 'success' : 'warning');
+      } else {
+        out.push('<span class="bad">存储查询失败</span>　' + esc(j.error));
+        if (j.conclusion) out.push('　' + esc(j.conclusion));
+        log('自检：存储查询失败 — ' + j.error, 'error');
+      }
+    } catch (e) {
+      out.push('<span class="bad">存储查询失败</span>　' + esc(e.message));
+      log('自检：存储查询失败 — ' + e.message, 'error');
+    }
+
+    $('searchResult').innerHTML =
+      '<pre style="margin:0;white-space:pre-wrap;font-family:inherit;font-size:12px">' +
+      out.join('\n') + '</pre>';
+    $('recHint').textContent = '自检完成';
+  }
+
+  async function searchRecords() {
+    let body;
+    try { body = recPayload(); } catch (e) {
+      $('searchResult').innerHTML = '<span class="bad">' + e.message + '</span>';
+      log('查询失败：' + e.message, 'error');
+      return;
+    }
+    $('searchResult').textContent = '正在查询 ' + body.start + ' ~ ' + body.end + ' ...';
+    $('recHint').textContent = '查询中';
+    try {
+      const r = await fetchWithTimeout(recBase() + '/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 30000);
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || '查询失败');
+      if (!j.count) {
+        $('searchResult').innerHTML = '<span class="bad">该时间段没有录像</span>' +
+          (j.hint ? '　' + j.hint : '');
+        $('recHint').textContent = '0 段';
+        log('查询完成：该时间段没有录像', 'warning');
+        return;
+      }
+      const lines = j.segments.map((s, i) =>
+        '  ' + (i + 1) + '. ' + s.start + '  →  ' + s.end).join('\n');
+      $('searchResult').innerHTML = '<span class="ok">找到 ' + j.count + ' 段录像（UTC 时间）</span>\n' +
+        '<pre style="margin:6px 0 0;color:#a8b0c0;font-family:Consolas,monospace;font-size:11px">' +
+        lines.replace(/</g, '&lt;') + '</pre>';
+      $('recHint').textContent = j.count + ' 段';
+      log('查询完成：找到 ' + j.count + ' 段录像', 'success');
+    } catch (e) {
+      $('searchResult').innerHTML = '<span class="bad">' + e.message + '</span>';
+      $('recHint').textContent = '查询失败';
+      log('查询失败：' + e.message, 'error');
+    }
+  }
+
+  async function startDownload() {
+    let body;
+    try { body = recPayload(); } catch (e) {
+      $('searchResult').innerHTML = '<span class="bad">' + e.message + '</span>';
+      log('下载失败：' + e.message, 'error');
+      return;
+    }
+    hideProgress();
+    setProgress(0, '提交中');
+    try {
+      const r = await fetchWithTimeout(recBase() + '/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 20000);
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || '下载请求失败');
+      currentTaskId = j.taskId;
+      log('下载任务已提交，taskId = ' + j.taskId, 'success');
+      setStatus('正在下载', 'taskId ' + j.taskId, 'info');
+      if (progressTimer) clearInterval(progressTimer);
+      progressTimer = setInterval(pollProgress, 1200);
+      pollProgress();
+    } catch (e) {
+      setProgress(0, '失败');
+      log('下载失败：' + e.message, 'error');
+    }
+  }
+
+  async function pollProgress() {
+    if (!currentTaskId) return;
+    try {
+      const r = await fetchWithTimeout(recBase() + '/progress?taskId=' + currentTaskId, null, 10000);
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || '任务不存在');
+      setProgress(j.percent, j.message || j.status);
+
+      if (j.status === 'done') {
+        clearInterval(progressTimer);
+        progressTimer = null;
+        log('下载完成：' + j.file + '（' + (j.size / 1048576).toFixed(1) + ' MB）', 'success');
+        setStatus('下载完成', j.file, 'ok');
+        $('searchResult').innerHTML = '<span class="ok">已完成：</span>' + j.file +
+          '　<button type="button" class="primary" onclick="window.__saveFile(\'' +
+          String(j.file).replace(/'/g, '') + '\')">保存到本地</button>';
+        refreshTasks();
+      } else if (j.status === 'failed') {
+        clearInterval(progressTimer);
+        progressTimer = null;
+        setProgress(0, '失败');
+        log('下载失败：' + (j.error || '未知错误'), 'error');
+        setStatus('下载失败', j.error || '', 'error');
+        $('searchResult').innerHTML = '<span class="bad">下载失败：</span>' + (j.error || '');
+        refreshTasks();
+      }
+    } catch (e) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+      log('查询进度失败：' + e.message, 'error');
+    }
+  }
+
+  async function refreshTasks() {
+    try {
+      const r = await fetchWithTimeout(recBase() + '/tasks', null, 10000);
+      const j = await r.json();
+      if (!j.success) throw new Error('任务列表获取失败');
+      const tbody = $('taskTable');
+      tbody.innerHTML = '';
+      const list = (j.tasks || []).slice(0, 30);
+      if (!list.length) {
+        $('taskTableWrap').classList.add('hide');
+        return;
+      }
+      $('taskTableWrap').classList.remove('hide');
+      list.forEach((t) => {
+        const tr = document.createElement('tr');
+        const size = t.size ? (t.size / 1048576).toFixed(1) + ' MB' : '-';
+        const fileCell = t.file ? t.file : '-';
+        tr.innerHTML =
+          '<td><code>' + t.id + '</code></td>' +
+          '<td>' + t.status + (t.status === 'running' ? ' ' + t.percent + '%' : '') + '</td>' +
+          '<td>' + fileCell + '</td>' +
+          '<td>' + size + '</td>' +
+          '<td class="tableActions"></td>';
+        const cell = tr.querySelector('.tableActions');
+        if (t.file) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = '保存';
+          b.className = 'primary';
+          b.addEventListener('click', () => saveFile(t.file));
+          cell.appendChild(b);
+        }
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      log('任务列表获取失败：' + e.message, 'warning');
+    }
+  }
+
+  function saveFile(name) {
+    if (!name) return;
+    log('开始下载文件：' + name, 'detail');
+    window.location.href = recBase() + '/file?name=' + encodeURIComponent(name);
+  }
+  window.__saveFile = saveFile;
+
+  // ============================================================ 配置持久化
+
+  const STORE_KEY = 'keCameraConsole.config';
+
+  function saveConfig() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        svcHost: $('svcHost').value,
+        svcWebPort: $('svcWebPort').value,
+        svcPtzPort: $('svcPtzPort').value,
+        svcRecPort: $('svcRecPort').value,
+        brand: brand,
+        mode: mode,
+        device: {
+          ip: $('devIp').value,
+          username: $('devUser').value,
+          channel: $('devChannel').value,
+          subStream: $('devStream').value,
+          rtspPort: $('devRtspPort').value,
+          onvifPort: $('devOnvifPort').value,
+          isapiPort: $('devIsapiPort').value,
+        },
+        playback: { start: $('pbStart').value, end: $('pbEnd').value },
+        record: { start: $('recStart').value, end: $('recEnd').value },
+      }));
+    } catch (e) { /* localStorage 不可用时忽略 */ }
+  }
+
+  function restoreConfig() {
+    let c = {};
+    try { c = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (e) { c = {}; }
+    if (c.svcHost) $('svcHost').value = c.svcHost;
+    if (c.svcWebPort) $('svcWebPort').value = c.svcWebPort;
+    if (c.svcPtzPort) $('svcPtzPort').value = c.svcPtzPort;
+    if (c.svcRecPort) $('svcRecPort').value = c.svcRecPort;
+    if (c.brand && BRANDS[c.brand]) brand = c.brand;
+    if (c.mode === 'live' || c.mode === 'playback') mode = c.mode;
+    if (c.device) {
+      if (c.device.ip) $('devIp').value = c.device.ip;
+      if (c.device.username) $('devUser').value = c.device.username;
+      if (c.device.channel) $('devChannel').value = c.device.channel;
+      if (c.device.subStream != null) $('devStream').value = c.device.subStream;
+      if (c.device.rtspPort) $('devRtspPort').value = c.device.rtspPort;
+      if (c.device.onvifPort) $('devOnvifPort').value = c.device.onvifPort;
+      if (c.device.isapiPort) $('devIsapiPort').value = c.device.isapiPort;
+      // 恢复出来的两个端口不一致，说明 ISAPI 是手动指定的，不再自动跟随
+      if (c.device.onvifPort && c.device.isapiPort &&
+          String(c.device.onvifPort) !== String(c.device.isapiPort)) {
+        isapiManual = true;
+      }
+    }
+    if (c.playback) {
+      if (c.playback.start) $('pbStart').value = c.playback.start;
+      if (c.playback.end) $('pbEnd').value = c.playback.end;
+    }
+    if (c.record) {
+      if (c.record.start) $('recStart').value = c.record.start;
+      if (c.record.end) $('recEnd').value = c.record.end;
+    }
+  }
+
+  // ============================================================ 事件绑定
+
+  function applyBrand() {
+    $('devBrand').value = brand;
+    $('brandHint').textContent = BRANDS[brand].hint;
+  }
+
+  function applyModeButtons() {
+    Array.prototype.forEach.call($('modeButtons').children, (b) => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    $('pbTimeRow').style.display = mode === 'playback' ? '' : 'none';
+    $('modePill').textContent = mode === 'playback' ? '录像回放' : '实时';
+    $('modePill').className = 'pill' + (mode === 'playback' ? ' on' : '');
+  }
+
+  function bind() {
+    // 服务地址
+    $('btnApply').addEventListener('click', () => {
+      $('svcHost').value = host();
+      saveConfig();
+      disconnect(true);
+      stopPtz(false, true);
+      log('已应用服务地址：' + webstreamBase() + ' / ' + ptzBase() + ' / ' + recBase(), 'success');
+      ensureSdk().then(() => testServices());
+    });
+    $('btnRetest').addEventListener('click', testServices);
+    ['svcHost', 'svcWebPort', 'svcPtzPort', 'svcRecPort'].forEach((id) => {
+      $(id).addEventListener('change', saveConfig);
+    });
+
+    // 播放
+    $('btnConnect').addEventListener('click', connect);
+    $('btnDisconnect').addEventListener('click', () => disconnect(false));
+    $('btnReconnect').addEventListener('click', () => {
+      disconnect(true);
+      setTimeout(connect, 300);
+    });
+    $('rtspUrl').addEventListener('keyup', (e) => { if (e.key === 'Enter') connect(); });
+
+    $('videoEl').addEventListener('playing', () => {
+      if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
+      setStreamState('playing');
+      log('媒体流已开始播放', 'success');
+    });
+    $('videoEl').addEventListener('error', () => {
+      const v = $('videoEl');
+      if (!v || !v.error) return;
+      setStreamState('error');
+      log('video 播放错误，代码 ' + v.error.code, 'error');
+    });
+
+    // 模式
+    $('modeButtons').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-mode]');
+      if (!b) return;
+      mode = b.dataset.mode;
+      if (mode === 'playback' && (!$('pbStart').value || !$('pbEnd').value)) fillRange('hour');
+      applyModeButtons();
+      buildRtspUrl(false);
+      saveConfig();
+      log('播放模式：' + (mode === 'playback' ? '录像回放' : '实时预览'), 'detail');
+    });
+
+    $('pbRangeButtons').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-range]');
+      if (!b) return;
+      fillRange(b.dataset.range);
+      saveConfig();
+    });
+    $('pbStart').addEventListener('change', () => { buildRtspUrl(false); saveConfig(); });
+    $('pbEnd').addEventListener('change', () => { buildRtspUrl(false); saveConfig(); });
+
+    // 设备参数
+    $('devBrand').addEventListener('change', () => {
+      if ($('devBrand').value === brand) return;
+      stopPtz(false, true);
+      brand = $('devBrand').value;
+      applyBrand();
+      buildRtspUrl(false);
+      saveConfig();
+      log('已切换到' + BRANDS[brand].label, 'detail');
+    });
+
+    // 通道号加减
+    $('chMinus').addEventListener('click', () => {
+      $('devChannel').value = Math.max(1, (parseInt($('devChannel').value, 10) || 1) - 1);
+      buildRtspUrl(false);
+      syncPtzHint();
+      saveConfig();
+    });
+    $('chPlus').addEventListener('click', () => {
+      $('devChannel').value = Math.min(999, (parseInt($('devChannel').value, 10) || 1) + 1);
+      buildRtspUrl(false);
+      syncPtzHint();
+      saveConfig();
+    });
+
+    // 时间输入框：点击任意位置即弹出原生日期时间选择器
+    document.querySelectorAll('input[type="datetime-local"]').forEach((inp) => {
+      inp.addEventListener('click', () => {
+        try { inp.showPicker(); } catch (e) { /* 浏览器不支持时忽略 */ }
+      });
+    });
+
+    ['devChannel', 'devIp', 'devRtspPort', 'devOnvifPort', 'devIsapiPort',
+      'devUser', 'devPass', 'devStream'].forEach((id) => {
+      $(id).addEventListener('input', () => {
+        buildRtspUrl(false);
+        syncPtzHint();
+        saveConfig();
+      });
+      $(id).addEventListener('change', () => {
+        buildRtspUrl(false);
+        syncPtzHint();
+        saveConfig();
+      });
+    });
+
+    // ISAPI 端口默认跟随 ONVIF 端口
+    //   海康的 ISAPI 与 ONVIF 走的是同一个 HTTP 端口，用户改 ONVIF 时
+    //   只要没单独动过 ISAPI，就自动跟着变，避免填出两个不一样的端口。
+    $('devIsapiPort').addEventListener('input', () => { isapiManual = true; });
+    $('devOnvifPort').addEventListener('input', () => {
+      if (!isapiManual) $('devIsapiPort').value = $('devOnvifPort').value;
+    });
+
+    // 云台
+    $('btnTestPtz').addEventListener('click', async () => {
+      setService('Ptz', 'pending', '检测中');
+      const r = await checkPtz();
+      setService('Ptz', r.ok ? 'ok' : 'bad', r.ok ? '可用 · ' + r.info : '失败 · ' + r.error);
+      $('ptzPill').className = 'pill ' + (r.ok ? 'on' : 'off');
+      $('ptzPill').textContent = r.ok ? '服务可用' : '服务不可用';
+      log(r.ok ? 'ONVIF-PTZ 服务可用' : 'ONVIF-PTZ 检测失败：' + r.error, r.ok ? 'success' : 'error');
+    });
+
+    $('ptzSpeed').addEventListener('input', () => {
+      $('speedVal').textContent = Number($('ptzSpeed').value).toFixed(2);
+    });
+    $('zoomSpeed').addEventListener('input', () => {
+      $('zoomVal').textContent = Number($('zoomSpeed').value).toFixed(2);
+    });
+
+    $('ptzPad').addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('button[data-vec]');
+      if (!b) return;
+      e.preventDefault();
+      startPtz(b.dataset.vec.split(',').map(Number));
+    });
+    document.querySelectorAll('.zoomRow button[data-zoom]').forEach((b) => {
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const z = Number(b.dataset.zoom) * Number($('zoomSpeed').value);
+        startPtz([0, 0, z]);
+      });
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => {
+      $('ptzPad').addEventListener(ev, () => { if (ptzMoving) stopPtz(false, true); });
+      document.querySelectorAll('.zoomRow button[data-zoom]').forEach((b) => {
+        b.addEventListener(ev, () => { if (ptzMoving) stopPtz(false, true); });
+      });
+    });
+    window.addEventListener('pointerup', () => { if (ptzMoving) stopPtz(false, true); });
+    window.addEventListener('blur', () => { if (ptzMoving) stopPtz(false, true); });
+    $('btnStopPtz').addEventListener('click', () => stopPtz(true));
+
+    // 键盘控制
+    window.addEventListener('keydown', (e) => {
+      if (isEditable(e.target) || e.repeat) return;
+      if (e.key === 'Escape') { stopPtz(true); return; }
+      const zoom = Number($('zoomSpeed').value);
+      const vectors = {
+        ArrowUp: [0, 1, 0],
+        ArrowDown: [0, -1, 0],
+        ArrowLeft: [-1, 0, 0],
+        ArrowRight: [1, 0, 0],
+        '+': [0, 0, zoom],
+        '=': [0, 0, zoom],
+        '-': [0, 0, -zoom],
+        '_': [0, 0, -zoom],
+      };
+      const vec = vectors[e.key];
+      if (!vec) return;
+      e.preventDefault();
+      if (ptzMoving) return;
+      const payload = ptzPayload();
+      if (!payload) return;
+      ptzActivePayload = payload;
+      ptzMoving = true;
+      sendPtzMove(vec);
+      ptzTimer = setInterval(() => sendPtzMove(vec), 3000);
+    });
+    window.addEventListener('keyup', (e) => {
+      if (isEditable(e.target)) return;
+      if (e.key.indexOf('Arrow') === 0 || ['Escape', '+', '=', '-', '_'].indexOf(e.key) !== -1) {
+        if (ptzMoving) stopPtz(false, true);
+      }
+    });
+
+    // 录像下载
+    $('recRangeButtons').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-recrange]');
+      if (!b) return;
+      fillRange(b.dataset.recrange, 'rec');
+      saveConfig();
+    });
+    $('recStart').addEventListener('change', saveConfig);
+    $('recEnd').addEventListener('change', saveConfig);
+    $('btnSearch').addEventListener('click', searchRecords);
+    $('btnDiag').addEventListener('click', diagnoseDevice);
+    $('btnDownload').addEventListener('click', startDownload);
+    $('btnSyncTime').addEventListener('click', () => {
+      if (!$('pbStart').value || !$('pbEnd').value) { log('回放时间还没填', 'warning'); return; }
+      $('recStart').value = $('pbStart').value;
+      $('recEnd').value = $('pbEnd').value;
+      saveConfig();
+      log('已把回放时间同步到下载区间', 'detail');
+    });
+    $('btnRefreshTasks').addEventListener('click', refreshTasks);
+
+    // 日志
+    $('btnClearLog').addEventListener('click', () => { $('logOutput').innerHTML = ''; });
+  }
+
+  // ============================================================ 初始化
+
+  function init() {
+    if (!$('svcHost').value) $('svcHost').value = location.hostname || '127.0.0.1';
+    restoreConfig();
+    if (!$('svcHost').value) $('svcHost').value = location.hostname || '127.0.0.1';
+
+    applyBrand();
+    applyModeButtons();
+
+    const now = new Date();
+    if (!$('pbStart').value || !$('pbEnd').value) fillRange('hour');
+    if (!$('recStart').value || !$('recEnd').value) fillRange('hour', 'rec');
+    $('speedVal').textContent = Number($('ptzSpeed').value).toFixed(2);
+    $('zoomVal').textContent = Number($('zoomSpeed').value).toFixed(2);
+
+    buildRtspUrl(false);
+    syncPtzHint();
+    bind();
+
+    log('调试台已加载', 'detail');
+    log('WebRTC ' + webstreamBase() + '　PTZ ' + ptzBase() + '　下载 ' + recBase(), 'detail');
+    setStatus('就绪', '填写设备信息后点击「连接」或「查询录像」', 'info');
+
+    testServices();
+    refreshTasks();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

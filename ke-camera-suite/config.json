@@ -1,0 +1,12 @@
+{
+    "urls": {
+        "Camera1": {
+            "video": "rtsp://admin:admin123456@192.168.1.100:554/stream1",
+            "options": "rtptransport=tcp&timeout=60"
+        },
+        "Camera2": {
+            "video": "rtsp://admin:admin123456@192.168.1.101:554/stream1",
+            "options": "rtptransport=tcp&timeout=60"
+        }
+    }
+}
