@@ -18,7 +18,7 @@ echo "  卸载摄像头服务套件"
 echo "============================================"
 echo
 
-for SVC in ke-webrtc ke-ptz ke-record; do
+for SVC in ke-webrtc ke-ptz ke-record ke-web; do
     if systemctl list-unit-files | grep -q "^${SVC}.service"; then
         systemctl stop    "${SVC}" 2>/dev/null || true
         systemctl disable "${SVC}" 2>/dev/null || true

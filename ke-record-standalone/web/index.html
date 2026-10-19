@@ -31,6 +31,13 @@
   button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { border-color: #2f5a8a; background: #1c3a5e; color: #c7dfff; }
   button.primary:hover { background: #22456f; color: #fff; }
+  /* 删除是破坏性操作，用红调区分，避免和「保存」点混 */
+  button.danger { border-color: #4a2c2c; background: #2a2020; color: #e2a09a; }
+  button.danger:hover:not(:disabled) { border-color: #7a3a34; background: #3a2422; color: #ffb6ae; }
+  .bad { color: #e2574c; }
+  /* 表格单元格里的第二行小字（失败原因 / 保留天数） */
+  .cellSub { margin-top: 3px; color: #7d8798; font-size: 10px; line-height: 1.5; }
+  .cellSub.bad { color: #e2574c; }
   button.active { border-color: #2f5a8a; background: #1c3a5e; color: #c7dfff; font-weight: 600; }
   input, select {
     width: 100%;
@@ -109,7 +116,9 @@
   .statusBar.warn { border-color: #e8a33d; background: rgba(232,163,61,.07); }
 
   .mainGrid { display: grid; grid-template-columns: minmax(0,1fr) 360px; align-items: stretch; gap: 15px; }
-  .playerColumn { min-width: 0; }
+  /* align-self:start 很关键：右侧控制面板伸缩时，左侧播放区不会跟着被拉高，
+     视频尺寸只由宽度决定（aspect-ratio 16/9），点开/收起任何面板画面都不跳动 */
+  .playerColumn { min-width: 0; align-self: start; }
   .player {
     position: relative; overflow: hidden; width: 100%;
     aspect-ratio: 16 / 9; border: 1px solid #272c37; border-radius: 7px; background: #000;
@@ -162,6 +171,32 @@
   .sliderRow label b { color: #c7cbd4; font-family: Consolas, "Cascadia Mono", monospace; font-weight: 500; }
   .hintLine { margin-top: 8px; color: #7d8798; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
 
+  /* ---- 可折叠分区：点标题收起/展开，收起后不占高度 ---- */
+  .secToggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer; user-select: none;
+  }
+  .secToggle:hover { color: #fff; }
+  .secToggle .caret {
+    display: inline-block; width: 10px; font-size: 9px; line-height: 1;
+    color: #7d8798; transition: transform .18s ease;
+  }
+  .collapsible.collapsed > .collapseBody { display: none; }
+  /* 收起后不再参与弹性拉伸，避免留下一个空白大块 */
+  .collapsible.collapsed { flex: none; }
+  .collapsible.collapsed .secToggle .caret { transform: rotate(-90deg); }
+  .collapseBody { min-width: 0; }
+  .directionSection .collapseBody {
+    display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0;
+  }
+
+  /* ---- 设备历史记录 ---- */
+  .historyRow {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 12px;
+  }
+  .historyRow .historyField { flex: 1 1 300px; min-width: 0; }
+  .historyRow button { height: 36px; flex: none; }
+
   .configPanel, .recordPanel, .logPanel { margin-top: 14px; padding: 14px; }
   .modeButtons button { min-height: 30px; padding: 4px 13px; }
 
@@ -180,6 +215,11 @@
     display: grid; grid-template-columns: minmax(190px,1fr) minmax(190px,1fr) auto;
     align-items: end; gap: 10px; margin-top: 12px;
   }
+  /* 侧栏只有 360px 宽，两列 190px + 按钮会溢出。
+     stacked 变体：第一行两个时间，第二行按钮整行铺开 */
+  .timeRow.stacked { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; }
+  .timeRow.stacked .rangeButtons { grid-column: 1 / -1; flex-wrap: wrap; }
+  .timeRow.stacked .rangeButtons button { flex: 1 1 auto; }
   .timeRow input { font-family: inherit; font-size: 12px; }
   input[type="datetime-local"] { cursor: pointer; }
   input[type="datetime-local"]::-webkit-calendar-picker-indicator {
@@ -315,51 +355,67 @@
               </select>
             </label>
           </div>
-          <div class="timeRow hide" id="pbTimeRow" style="display:none">
-            <label>开始时间<input id="pbStart" type="datetime-local"></label>
-            <label>结束时间<input id="pbEnd" type="datetime-local"></label>
-            <div class="rangeButtons" id="pbRangeButtons">
-              <button type="button" data-range="today">今天</button>
-              <button type="button" data-range="yesterday">昨天</button>
-              <button type="button" data-range="hour">最近1小时</button>
+
+          <p class="hintLine" id="pbPtzHint" style="display:none">回放模式下已自动收起「云台参数」与「方向」，切回实时预览即恢复</p>
+
+          <div class="collapsible" id="secPbTime" style="display:none">
+            <div class="sectionTitle subSectionTitle" style="margin-top:10px">
+              <h3 class="secToggle" data-collapse="secPbTime"><span class="caret">&#9660;</span>回放时间</h3>
+            </div>
+            <div class="collapseBody">
+              <div class="timeRow stacked" id="pbTimeRow">
+                <label>开始时间<input id="pbStart" type="datetime-local"></label>
+                <label>结束时间<input id="pbEnd" type="datetime-local"></label>
+                <div class="rangeButtons" id="pbRangeButtons">
+                  <button type="button" data-range="today">今天</button>
+                  <button type="button" data-range="yesterday">昨天</button>
+                  <button type="button" data-range="hour">最近1小时</button>
+                </div>
+              </div>
+              <p class="hintLine" id="pbNote"></p>
             </div>
           </div>
-          <p class="hintLine" id="pbNote"></p>
         </div>
 
-        <div class="panelSection">
+        <div class="panelSection collapsible" id="secPtzParams">
           <div class="sectionTitle subSectionTitle">
-            <h3>云台参数</h3>
+            <h3 class="secToggle" data-collapse="secPtzParams"><span class="caret">&#9660;</span>云台参数</h3>
             <button type="button" id="btnTestPtz">检测云台服务</button>
           </div>
-          <p class="hintLine" id="ptzAddrHint">ONVIF 地址（待填写设备 IP）</p>
-          <div class="sliderRow">
-            <label><span>移动速度</span><b id="speedVal">0.50</b></label>
-            <input id="ptzSpeed" type="range" min="0.1" max="1" step="0.05" value="0.5">
-          </div>
-          <div class="sliderRow">
-            <label><span>变倍速度</span><b id="zoomVal">0.50</b></label>
-            <input id="zoomSpeed" type="range" min="0.1" max="1" step="0.05" value="0.5">
+          <div class="collapseBody">
+            <p class="hintLine" id="ptzAddrHint">ONVIF 地址（待填写设备 IP）</p>
+            <div class="sliderRow">
+              <label><span>移动速度</span><b id="speedVal">0.50</b></label>
+              <input id="ptzSpeed" type="range" min="0.1" max="1" step="0.05" value="0.5">
+            </div>
+            <div class="sliderRow">
+              <label><span>变倍速度</span><b id="zoomVal">0.50</b></label>
+              <input id="zoomSpeed" type="range" min="0.1" max="1" step="0.05" value="0.5">
+            </div>
           </div>
         </div>
 
-        <div class="panelSection directionSection" id="dirSection">
-          <div class="sectionTitle subSectionTitle"><h3>方向（按住持续移动，Esc 停止）</h3></div>
-          <div class="padWrap">
-            <div class="ptzPad" id="ptzPad">
-              <button type="button" data-vec="-1,1,0" aria-label="左上">&#8598;</button>
-              <button type="button" data-vec="0,1,0" aria-label="上">&#8593;</button>
-              <button type="button" data-vec="1,1,0" aria-label="右上">&#8599;</button>
-              <button type="button" data-vec="-1,0,0" aria-label="左">&#8592;</button>
-              <button class="stopButton" type="button" id="btnStopPtz" aria-label="停止">&#9632;</button>
-              <button type="button" data-vec="1,0,0" aria-label="右">&#8594;</button>
-              <button type="button" data-vec="-1,-1,0" aria-label="左下">&#8601;</button>
-              <button type="button" data-vec="0,-1,0" aria-label="下">&#8595;</button>
-              <button type="button" data-vec="1,-1,0" aria-label="右下">&#8600;</button>
-            </div>
-            <div class="zoomRow">
-              <button type="button" data-zoom="1">&#65291; 变倍</button>
-              <button type="button" data-zoom="-1">&#65293; 变倍</button>
+        <div class="panelSection directionSection collapsible" id="dirSection">
+          <div class="sectionTitle subSectionTitle">
+            <h3 class="secToggle" data-collapse="dirSection"><span class="caret">&#9660;</span>方向（按住持续移动，Esc 停止）</h3>
+          </div>
+          <div class="collapseBody">
+            <div class="padWrap">
+              <div class="ptzPad" id="ptzPad">
+                <button type="button" data-vec="-1,1,0" aria-label="左上">&#8598;</button>
+                <button type="button" data-vec="0,1,0" aria-label="上">&#8593;</button>
+                <button type="button" data-vec="1,1,0" aria-label="右上">&#8599;</button>
+                <button type="button" data-vec="-1,0,0" aria-label="左">&#8592;</button>
+                <button class="stopButton" type="button" id="btnStopPtz" aria-label="停止">&#9632;</button>
+                <button type="button" data-vec="1,0,0" aria-label="右">&#8594;</button>
+                <button type="button" data-vec="-1,-1,0" aria-label="左下">&#8601;</button>
+                <button type="button" data-vec="0,-1,0" aria-label="下">&#8595;</button>
+                <button type="button" data-vec="1,-1,0" aria-label="右下">&#8600;</button>
+              </div>
+              <div class="zoomRow">
+                <button type="button" data-zoom="1">&#65291; 变倍</button>
+                <button type="button" data-zoom="-1">&#65293; 变倍</button>
+              </div>
             </div>
           </div>
         </div>
@@ -370,6 +426,18 @@
       <div class="sectionTitle">
         <h2>设备参数</h2>
       </div>
+
+      <div class="historyRow">
+        <label class="historyField">历史记录（选一条自动回填全部参数）
+          <select id="devHistory">
+            <option value="">— 选择已保存的设备 —</option>
+          </select>
+        </label>
+        <button type="button" id="btnSaveProfile">保存当前</button>
+        <button type="button" id="btnDelProfile">删除这条</button>
+        <button type="button" id="btnClearHistory">清空全部</button>
+      </div>
+
       <div class="deviceGrid">
         <label>品牌
           <select id="devBrand">
@@ -383,7 +451,7 @@
         <label>ONVIF 端口<input id="devOnvifPort" type="number" min="1" max="65535" value="80"></label>
         <label>ISAPI 端口<input id="devIsapiPort" type="number" min="1" max="65535" value="80"></label>
         <label>用户名<input id="devUser" spellcheck="false" autocomplete="off" value="admin"></label>
-        <label>密码<input id="devPass" type="password" autocomplete="new-password"></label>
+        <label>密码<input id="devPass" type="text" spellcheck="false" autocomplete="off" placeholder="明文显示，方便核对"></label>
       </div>
       <p class="hintLine" id="brandHint"></p>
     </section>
@@ -424,7 +492,7 @@
       <div class="tableScroll hide" id="taskTableWrap">
         <table>
           <thead>
-            <tr><th>任务</th><th>状态</th><th>文件</th><th>大小</th><th>操作</th></tr>
+            <tr><th>任务</th><th>状态</th><th>文件</th><th>大小</th><th>下载时间</th><th>操作</th></tr>
           </thead>
           <tbody id="taskTable"></tbody>
         </table>
@@ -460,6 +528,24 @@
   function localInputToStr(v) {
     if (!v) return '';
     return v.replace('T', ' ') + (v.length === 16 ? ':00' : '');
+  }
+
+  /** 设备返回的时间串 -> 原样显示（不做时区换算，选什么就是什么） */
+  function fmtLocal(iso) {
+    if (!iso) return '?';
+    const s = String(iso).replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/i, '').trim();
+    return s || String(iso);
+  }
+
+  /** 秒数 -> '1 小时 23 分' */
+  function fmtSec(sec) {
+    const n = Math.max(0, Math.round(sec || 0));
+    const h = Math.floor(n / 3600);
+    const m = Math.floor((n % 3600) / 60);
+    const s = n % 60;
+    if (h) return h + ' 小时 ' + m + ' 分';
+    if (m) return m + ' 分 ' + s + ' 秒';
+    return s + ' 秒';
   }
 
   let logSeq = 0;
@@ -636,9 +722,11 @@
   }
 
   function formatHikTime(value) {
+    // 用本地 getter，不要用 getUTC* —— 选几点就发几点，不做时区换算。
+    // 用 getUTC* 会在东八区把时间减 8 小时（踩过）。
     const d = new Date(value);
-    return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) +
-      't' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'z';
+    return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) +
+      't' + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()) + 'z';
   }
 
   function formatDahuaTime(value) {
@@ -678,7 +766,7 @@
       if (brand === 'hik') {
         url = prefix + '/Streaming/tracks/' + (ch * 100 + 1) +
           '?starttime=' + formatHikTime(start) + '&endtime=' + formatHikTime(end);
-        $('pbNote').textContent = '海康录像时间以 UTC 编码；当前通道 ' + ch + '。';
+        $('pbNote').textContent = '时间按设备本地时间填写，不做时区换算；当前通道 ' + ch + '。';
       } else if (brand === 'dahua') {
         url = prefix + '/cam/playback?channel=' + ch + '&subtype=' + sub +
           '&starttime=' + formatDahuaTime(start) + '&endtime=' + formatDahuaTime(end);
@@ -739,6 +827,7 @@
   let sdkLoading = null;
   let connectTimeout = null;
   let streamState = 'idle';
+  let connectRetried = false;      // 超时自动重试只做一次，避免无限循环
 
   function setStreamState(s) {
     streamState = s;
@@ -786,19 +875,74 @@
     return sdkLoading;
   }
 
-  async function connect() {
-    const url = ($('rtspUrl').value || '').trim();
-    if (!url) {
+  /**
+   * 清掉 webrtc-streamer 上所有残留会话。
+   *
+   * 为什么需要：推流服务每收到一个 RTSP 地址就建一条流并一直拉着，
+   * 前端断开（hangup）时如果没走干净，那条流会继续占着设备的 RTSP 通道。
+   * 海康 NVR 的回放并发只有 1~2 路，被占满后新的回放请求直接返回
+   * `453 Not Enough Bandwidth` —— 表现就是「过一会儿同样的参数就不出画面了」。
+   */
+  async function purgeStreamer(silent) {
+    const base = webstreamBase();
+    let list;
+    try {
+      const r = await fetchWithTimeout(base + '/api/getPeerConnectionList', null, 4000);
+      list = await r.json();
+    } catch (e) {
+      if (!silent) log('读取推流会话列表失败：' + e.message, 'warning');
+      return 0;
+    }
+    if (!Array.isArray(list) || !list.length) return 0;
+
+    let n = 0;
+    for (const id of list) {
+      try {
+        await fetchWithTimeout(base + '/api/hangup?peerid=' + encodeURIComponent(id), null, 4000);
+        n++;
+      } catch { /* 单个失败不影响其它的 */ }
+    }
+    if (!silent) log('已清理 ' + n + ' 个残留推流会话', 'warning');
+    return n;
+  }
+
+  /**
+   * 回放地址每次带一个唯一时间戳。
+   *
+   * 推流服务按 URL 缓存流：同一个 starttime/endtime 再次请求，会直接复用
+   * 上一条已经放到结尾的流 —— 画面就一直是黑的。加 `_t` 强制它新建。
+   * 设备会忽略这个未知参数（实测海康接受）。
+   */
+  function withNonce(url) {
+    if (!url) return url;
+    if (!/starttime=/i.test(url)) return url;          // 只处理回放地址
+    if (/[?&]_t=/.test(url)) return url;               // 已经带过就别重复加
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now();
+  }
+
+  async function connect(isRetry) {
+    const rawUrl = ($('rtspUrl').value || '').trim();
+    if (!rawUrl) {
       log('播放地址为空，请填写设备信息或直接粘贴 RTSP 地址', 'error');
       setStatus('无法连接', '播放地址为空', 'error');
       return;
     }
+    if (!isRetry) connectRetried = false;
+
     disconnect(true);
+    // 连之前先清场：残留会话会占着设备的回放通道，占满就 453
+    await purgeStreamer(true);
+
     const ready = await ensureSdk();
     if (!ready) {
       setStreamState('error');
       return;
     }
+    autoRemember();
+
+    // 回放地址加 nonce，避免命中推流服务的 URL 缓存（同参数黑屏的根因）
+    const url = withNonce(rawUrl);
+
     const cfg = window.webrtcConfig || {};
     const options = cfg.options || 'rtptransport=tcp&timeout=60';
     try {
@@ -806,12 +950,21 @@
       streamer.connect(url, null, options, undefined, cfg.codec || undefined);
       setStreamState('connecting');
       log('开始连接' + (mode === 'playback' ? '录像回放' : '实时视频') + '：' + maskUrl(url), 'detail');
-      connectTimeout = setTimeout(() => {
+      connectTimeout = setTimeout(async () => {
         const v = $('videoEl');
-        if (streamState === 'connecting' && v && v.readyState === 0) {
-          setStreamState('error');
-          log('等待媒体流超时，请检查设备地址、通道与编码（H.265 浏览器可能不支持）', 'warning');
+        if (streamState !== 'connecting' || !v || v.readyState !== 0) return;
+
+        // 12 秒还没收到媒体流：清一次残留会话，换个 nonce 自动重试一遍
+        if (!connectRetried) {
+          connectRetried = true;
+          log('等待媒体流超时，清理残留会话后重试一次', 'warning');
+          disconnect(true);
+          await purgeStreamer(false);
+          setTimeout(() => connect(true), 400);
+          return;
         }
+        setStreamState('error');
+        log('等待媒体流超时，请检查设备地址、通道与编码（H.265 浏览器可能不支持）', 'warning');
       }, 12000);
     } catch (e) {
       setStreamState('error');
@@ -939,7 +1092,9 @@
       stream: d.subStream ? 'sub' : 'main',
       start: start,
       end: end,
-      tz: 8,
+      // 0 = 不做时区换算：选 20:00 就按 20:00 发给设备。
+      // 以前填 8，服务端会把时间减 8 小时，下载到的画面比选的早 8 小时。
+      tz: 0,
     };
   }
 
@@ -1071,12 +1226,23 @@
         return;
       }
       const lines = j.segments.map((s, i) =>
-        '  ' + (i + 1) + '. ' + s.start + '  →  ' + s.end).join('\n');
-      $('searchResult').innerHTML = '<span class="ok">找到 ' + j.count + ' 段录像（UTC 时间）</span>\n' +
+        '  ' + (i + 1) + '. ' + fmtLocal(s.start) + '  →  ' + fmtLocal(s.end)
+        + (s.seconds ? '　(' + fmtSec(s.seconds) + ')' : '')).join('\n');
+      // 设备是按「文件」存的，一段可能有 1~2 小时、1GB+，比用户要的区间长得多
+      const askedSec = Math.max(0, (new Date(localInputToStr($('recEnd').value))
+        - new Date(localInputToStr($('recStart').value))) / 1000);
+      const note = (j.totalSeconds && askedSec && j.totalSeconds > askedSec * 1.5)
+        ? '<div style="margin-top:6px;color:#e8a33d">提示：设备按整段文件存储，'
+          + '本次要下载 ' + fmtSec(j.totalSeconds) + '（你要的是 ' + fmtSec(askedSec)
+          + '）。成品会自动裁剪到你选的区间，但传输量按整段算，耗时会长一些。</div>'
+        : '';
+      $('searchResult').innerHTML = '<span class="ok">找到 ' + j.count + ' 段录像'
+        + (j.totalText ? '，共 ' + j.totalText : '') + '</span>\n' +
         '<pre style="margin:6px 0 0;color:#a8b0c0;font-family:Consolas,monospace;font-size:11px">' +
-        lines.replace(/</g, '&lt;') + '</pre>';
+        lines.replace(/</g, '&lt;') + '</pre>' + note;
       $('recHint').textContent = j.count + ' 段';
-      log('查询完成：找到 ' + j.count + ' 段录像', 'success');
+      log('查询完成：找到 ' + j.count + ' 段录像' + (j.totalText ? '，共 ' + j.totalText : ''), 'success');
+      autoRemember();
     } catch (e) {
       $('searchResult').innerHTML = '<span class="bad">' + e.message + '</span>';
       $('recHint').textContent = '查询失败';
@@ -1103,6 +1269,7 @@
       if (!j.success) throw new Error(j.error || '下载请求失败');
       currentTaskId = j.taskId;
       log('下载任务已提交，taskId = ' + j.taskId, 'success');
+      autoRemember();
       setStatus('正在下载', 'taskId ' + j.taskId, 'info');
       if (progressTimer) clearInterval(progressTimer);
       progressTimer = setInterval(pollProgress, 1200);
@@ -1159,29 +1326,99 @@
         return;
       }
       $('taskTableWrap').classList.remove('hide');
+      const keepDays = j.retentionDays || 7;
+
       list.forEach((t) => {
         const tr = document.createElement('tr');
         const size = t.size ? (t.size / 1048576).toFixed(1) + ' MB' : '-';
-        const fileCell = t.file ? t.file : '-';
+
+        // 状态格：下载中带百分比；失败把原因显示出来，不然只看到一个 failed 没法排查
+        let statusCell = STATUS_TEXT[t.status] || t.status || '-';
+        if (t.status === 'running') statusCell += ' ' + (t.percent || 0) + '%';
+        if (t.status === 'failed' && t.error) {
+          statusCell += '<div class="cellSub bad">' + esc(t.error) + '</div>';
+        }
+
+        // 文件格：磁盘上没了就标红，别让人点了「保存」才吃 404
+        const gone = t.file && t.fileExists === false;
+        const fileCell = t.file
+          ? '<span' + (gone ? ' class="bad"' : '') + '>' + esc(t.file) + '</span>'
+            + (gone ? '<div class="cellSub">文件已被清理</div>' : '')
+          : '-';
+
         tr.innerHTML =
-          '<td><code>' + t.id + '</code></td>' +
-          '<td>' + t.status + (t.status === 'running' ? ' ' + t.percent + '%' : '') + '</td>' +
+          '<td><code>' + esc(t.id) + '</code></td>' +
+          '<td>' + statusCell + '</td>' +
           '<td>' + fileCell + '</td>' +
           '<td>' + size + '</td>' +
+          '<td>' + fmtTaskTime(t.createdAt, t.expiresAt, keepDays) + '</td>' +
           '<td class="tableActions"></td>';
+
         const cell = tr.querySelector('.tableActions');
+
         if (t.file) {
           const b = document.createElement('button');
           b.type = 'button';
           b.textContent = '保存';
           b.className = 'primary';
+          b.disabled = gone;
+          if (gone) b.title = '文件已不在服务器上';
           b.addEventListener('click', () => saveFile(t.file));
           cell.appendChild(b);
         }
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.textContent = '删除';
+        del.className = 'danger';
+        const busy = t.status === 'running' || t.status === 'queued';
+        del.disabled = busy;
+        if (busy) del.title = '任务正在下载中，等它完成或失败后再删';
+        del.addEventListener('click', () => deleteTask(t));
+        cell.appendChild(del);
+
         tbody.appendChild(tr);
       });
     } catch (e) {
       log('任务列表获取失败：' + e.message, 'warning');
+    }
+  }
+
+  const STATUS_TEXT = { queued: '排队中', running: '下载中', done: '完成', failed: '失败' };
+
+  /** 任务时间格：下载时间 + 还剩几天到期（保留策略由服务端给） */
+  function fmtTaskTime(createdAt, expiresAt, keepDays) {
+    if (!createdAt) return '-';
+    const d = new Date(createdAt);
+    const p = (n) => String(n).padStart(2, '0');
+    const when = p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    if (!expiresAt) return when;
+    const left = expiresAt - Date.now();
+    const days = Math.ceil(left / 86400000);
+    const sub = left <= 0
+      ? '待清理'
+      : '保留 ' + keepDays + ' 天，还剩 ' + days + ' 天';
+    return when + '<div class="cellSub' + (left <= 0 ? ' bad' : '') + '">' + sub + '</div>';
+  }
+
+  async function deleteTask(t) {
+    const warn = t.file
+      ? '对应的视频文件也会一起删除，删了没法恢复：\n' + t.file
+      : '这条任务没有成品文件，只删记录。';
+    if (!window.confirm('删除任务 ' + t.id + ' ？\n\n' + warn)) return;
+
+    try {
+      const r = await fetchWithTimeout(
+        recBase() + '/task?id=' + encodeURIComponent(t.id),
+        { method: 'DELETE' }, 15000,
+      );
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || '删除失败');
+      log('已删除任务 ' + t.id + (j.fileDeleted ? '，视频文件已删除' : '（无文件可删）'), 'success');
+      if (t.fileError) log('文件删除失败：' + t.fileError, 'warning');
+      refreshTasks();
+    } catch (e) {
+      log('删除失败：' + e.message, 'error');
     }
   }
 
@@ -1208,6 +1445,7 @@
         device: {
           ip: $('devIp').value,
           username: $('devUser').value,
+          password: $('devPass').value,
           channel: $('devChannel').value,
           subStream: $('devStream').value,
           rtspPort: $('devRtspPort').value,
@@ -1232,6 +1470,7 @@
     if (c.device) {
       if (c.device.ip) $('devIp').value = c.device.ip;
       if (c.device.username) $('devUser').value = c.device.username;
+      if (c.device.password != null) $('devPass').value = c.device.password;
       if (c.device.channel) $('devChannel').value = c.device.channel;
       if (c.device.subStream != null) $('devStream').value = c.device.subStream;
       if (c.device.rtspPort) $('devRtspPort').value = c.device.rtspPort;
@@ -1253,6 +1492,106 @@
     }
   }
 
+  // ============================================================ 设备历史记录
+  //
+  // 局域网自用工具，历史存在本机 localStorage，含密码明文（已与使用者确认）。
+  // 换电脑/清浏览器数据就没了，不会外传。
+
+  const HIST_KEY = 'keCameraConsole.history';
+  const HIST_MAX = 12;
+
+  function histLoad() {
+    try {
+      const a = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+
+  function histSave(list) {
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, HIST_MAX))); }
+    catch (e) { log('历史记录写入失败：' + (e.message || e), 'warning'); }
+  }
+
+  function histKey(p) {
+    return [p.ip, p.username, p.rtspPort, p.onvifPort, p.isapiPort, p.brand].join('|');
+  }
+
+  function currentProfile() {
+    const d = device();
+    return {
+      ip: d.ip, username: d.username, password: d.password,
+      channel: d.channel, subStream: d.subStream ? '1' : '0',
+      rtspPort: d.rtspPort, onvifPort: d.onvifPort, isapiPort: d.isapiPort,
+      brand: brand,
+    };
+  }
+
+  function histRender(selectKey) {
+    const sel = $('devHistory');
+    const list = histLoad();
+    const keep = selectKey !== undefined ? selectKey : sel.value;
+    sel.innerHTML = '<option value="">— 选择已保存的设备 —</option>';
+    list.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = histKey(p);
+      const brandName = BRANDS[p.brand] ? BRANDS[p.brand].label : p.brand;
+      o.textContent = p.ip + ' · ' + (p.username || '匿名')
+        + (p.channel ? ' · 通道' + p.channel : '') + ' · ' + brandName;
+      sel.appendChild(o);
+    });
+    if (keep && list.some((p) => histKey(p) === keep)) sel.value = keep;
+    $('btnDelProfile').disabled = !sel.value;
+  }
+
+  function histUpsert(profile) {
+    const list = histLoad();
+    const k = histKey(profile);
+    const i = list.findIndex((p) => histKey(p) === k);
+    if (i >= 0) list.splice(i, 1);
+    list.unshift(Object.assign({}, profile, { savedAt: Date.now() }));
+    histSave(list);
+    histRender(k);
+  }
+
+  function histApply(key) {
+    const p = histLoad().find((x) => histKey(x) === key);
+    if (!p) return;
+    if (p.brand && BRANDS[p.brand]) brand = p.brand;
+    $('devIp').value = p.ip || '';
+    $('devUser').value = p.username || '';
+    $('devPass').value = p.password || '';
+    if (p.channel) $('devChannel').value = p.channel;
+    if (p.rtspPort) $('devRtspPort').value = p.rtspPort;
+    if (p.onvifPort) $('devOnvifPort').value = p.onvifPort;
+    if (p.isapiPort) $('devIsapiPort').value = p.isapiPort;
+    if (p.subStream != null) $('devStream').value = p.subStream;
+    if (String(p.onvifPort) !== String(p.isapiPort)) isapiManual = true;
+    applyBrand();
+    buildRtspUrl(false);
+    syncPtzHint();
+    saveConfig();
+    log('已载入历史设备：' + p.ip + '（' + (p.username || '匿名') + '）', 'success');
+  }
+
+  /** 只要设备 IP 有效就自动记一条，不用用户手动点保存 */
+  function autoRemember() {
+    const p = currentProfile();
+    if (!p.ip) return;
+    histUpsert(p);
+  }
+
+  // ============================================================ 折叠面板
+
+  function setCollapsed(id, flag) {
+    const el = $(id);
+    if (el) el.classList.toggle('collapsed', !!flag);
+  }
+
+  function toggleCollapsed(id) {
+    const el = $(id);
+    if (el) el.classList.toggle('collapsed');
+  }
+
   // ============================================================ 事件绑定
 
   function applyBrand() {
@@ -1264,16 +1603,67 @@
     Array.prototype.forEach.call($('modeButtons').children, (b) => {
       b.classList.toggle('active', b.dataset.mode === mode);
     });
-    $('pbTimeRow').style.display = mode === 'playback' ? '' : 'none';
-    $('modePill').textContent = mode === 'playback' ? '录像回放' : '实时';
-    $('modePill').className = 'pill' + (mode === 'playback' ? ' on' : '');
+
+    const isPb = mode === 'playback';
+
+    // 回放时间区整块随模式显隐；进回放时默认展开，之后用户可自行收起
+    const sec = $('secPbTime');
+    if (isPb) {
+      sec.style.display = '';
+      sec.classList.remove('collapsed');
+    } else {
+      sec.style.display = 'none';
+    }
+
+    // 回放模式下云台用不上，整块收起，把高度让给回放时间，避免下面的分区被顶出首屏。
+    // 这里用 display 而不是 .collapsed：用户手动收起的偏好要保留，切回实时预览原样恢复。
+    ['secPtzParams', 'dirSection'].forEach((id) => {
+      const el = $(id);
+      if (el) el.style.display = isPb ? 'none' : '';
+    });
+    $('pbPtzHint').style.display = isPb ? '' : 'none';
+
+    $('modePill').textContent = isPb ? '录像回放' : '实时';
+    $('modePill').className = 'pill' + (isPb ? ' on' : '');
   }
 
   function bind() {
+    // 折叠面板：点标题收起/展开
+    document.querySelectorAll('[data-collapse]').forEach((h) => {
+      h.addEventListener('click', () => toggleCollapsed(h.dataset.collapse));
+    });
+
+    // 设备历史记录
+    $('devHistory').addEventListener('change', () => {
+      const k = $('devHistory').value;
+      $('btnDelProfile').disabled = !k;
+      if (k) histApply(k);
+    });
+    $('btnSaveProfile').addEventListener('click', () => {
+      const p = currentProfile();
+      if (!p.ip) { log('先填设备 IP 再保存', 'warning'); return; }
+      histUpsert(p);
+      log('已保存设备历史：' + p.ip + '（' + (p.username || '匿名') + '）', 'success');
+    });
+    $('btnDelProfile').addEventListener('click', () => {
+      const k = $('devHistory').value;
+      if (!k) return;
+      histSave(histLoad().filter((p) => histKey(p) !== k));
+      histRender('');
+      log('已删除该条设备历史', 'detail');
+    });
+    $('btnClearHistory').addEventListener('click', () => {
+      if (!window.confirm('确定清空全部设备历史记录？')) return;
+      histSave([]);
+      histRender('');
+      log('已清空设备历史', 'detail');
+    });
+
     // 服务地址
     $('btnApply').addEventListener('click', () => {
       $('svcHost').value = host();
       saveConfig();
+      autoRemember();
       disconnect(true);
       stopPtz(false, true);
       log('已应用服务地址：' + webstreamBase() + ' / ' + ptzBase() + ' / ' + recBase(), 'success');
@@ -1285,13 +1675,26 @@
     });
 
     // 播放
-    $('btnConnect').addEventListener('click', connect);
+    $('btnConnect').addEventListener('click', () => connect());
     $('btnDisconnect').addEventListener('click', () => disconnect(false));
-    $('btnReconnect').addEventListener('click', () => {
+    $('btnReconnect').addEventListener('click', async () => {
       disconnect(true);
-      setTimeout(connect, 300);
+      // 重连前强制清场：把推流服务上可能残留的会话全部踢掉，
+      // 否则设备的回放通道还被占着，重连也是黑屏
+      await purgeStreamer(false);
+      setTimeout(() => connect(), 300);
     });
     $('rtspUrl').addEventListener('keyup', (e) => { if (e.key === 'Enter') connect(); });
+
+    // 刷新/关页面前主动 hangup，否则推流服务那条流会一直挂着占设备的通道
+    window.addEventListener('beforeunload', () => {
+      try {
+        if (streamer && streamer.pc && streamer.pc.peerid != null) {
+          fetch(webstreamBase() + '/api/hangup?peerid=' + encodeURIComponent(streamer.pc.peerid),
+            { keepalive: true });
+        }
+      } catch { /* 关页面时失败无所谓 */ }
+    });
 
     $('videoEl').addEventListener('playing', () => {
       if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null; }
@@ -1484,6 +1887,13 @@
     if (!$('svcHost').value) $('svcHost').value = location.hostname || '127.0.0.1';
     restoreConfig();
     if (!$('svcHost').value) $('svcHost').value = location.hostname || '127.0.0.1';
+
+    // 没有上次配置时，用最近一条设备历史兜底，省得每次重填
+    histRender();
+    if (!$('devIp').value) {
+      const last = histLoad()[0];
+      if (last) histApply(histKey(last));
+    }
 
     applyBrand();
     applyModeButtons();

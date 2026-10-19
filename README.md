@@ -50,7 +50,8 @@
 - **Digest 认证手写**：Node 原生 `fetch`、JDK `HttpClient`、Python 标准库都不支持 Digest，
   故在三种语言里都手写了握手（先拿 `401 + WWW-Authenticate`，算摘要后重发）。
 - **trackID 规则**：`通道号 × 100 + 码流位`（通道1主码流 = `101`，子码流 = `102`，通道2 = `201`）。
-- **时区**：接口统一填**本地时间**，服务内部自动转 UTC。**填错时区是搜不到录像的头号原因。**
+- **时区**：接口填**设备上显示的时间**即可，服务**不做时区换算**（`tz` 默认 `0`）。
+  实测海康设备忽略时间字段末尾的 `Z`，按本地时间解析；早期版本按 +8 减 8 小时会让画面早 8 小时。
 - **转码降级链**：`copy → 仅转音频 → 完全转码`，自动重试直到成功。
 - **RTSP 回放捷径**：支持让 ffmpeg 直接拉带时间参数的 RTSP 回放流（快，但查不到有无录像）。
 
@@ -88,7 +89,8 @@ ke_camera_serve\
 | **ke-record-standalone** | 仅录像下载服务 | 只要“导出历史录像” |
 
 > 两包中的**录像下载服务是同一份代码、同一套接口**。两包均**自包含**
-> （自带 Node.js / nssm / ffmpeg），解压即用，无需联网安装依赖。
+> （自带 nssm / ffmpeg，Node.js 为可选兜底），解压即用，无需联网安装依赖。
+> 安装脚本会**优先使用本机已装的 Node.js**，本机没有才回落到包内的 `nodejs\`。
 
 #### ke-camera-suite 三大服务
 
@@ -171,7 +173,7 @@ node node/server.mjs --host 192.168.1.64 -u admin -p 你的密码 --port 8000
 |---|---|---|
 | `RECORD_PORT` | `3001` | 监听端口 |
 | `RECORD_DIR` | `<服务目录>/downloads` | 成品输出目录 |
-| `RECORD_TZ` | `8` | 默认时区 |
+| `RECORD_TZ` | `0` | 默认时区偏移，`0` = 不换算 |
 | `RECORD_CONCURRENCY` | `2` | 并发下载任务数 |
 | `ISAPI_PORT` | `80` | 默认 ISAPI 端口（请求参数优先） |
 | `FFMPEG_PATH` | 包内 `tools/ffmpeg[.exe]` | ffmpeg 路径 |

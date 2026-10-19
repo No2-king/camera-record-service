@@ -7,7 +7,7 @@
 #  特性:
 #   · 就地部署 —— 包放在哪就在哪跑, 不需要移动文件
 #   · 自动探测 node / ffmpeg
-#   · 自动生成 systemd 服务并开机自启
+#   · 自动生成两个 systemd 服务（ke-record + ke-web）并开机自启
 # ============================================================
 set -euo pipefail
 
@@ -78,7 +78,7 @@ WorkingDirectory=${REC_DIR}
 ExecStart=${NODE_BIN} ${REC_DIR}/server.js
 Environment=RECORD_PORT=${PORT}
 Environment=RECORD_DIR=${REC_DIR}/downloads
-Environment=RECORD_TZ=8
+Environment=RECORD_TZ=0
 Restart=always
 RestartSec=5
 StandardOutput=append:${REC_DIR}/logs/stdout.log
@@ -91,9 +91,31 @@ EOF
 echo "[OK] 已写入 ${UNIT}"
 echo
 
+cat > /etc/systemd/system/ke-web.service <<EOF
+[Unit]
+Description=KE Web Console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${ROOT}
+ExecStart=${NODE_BIN} ${ROOT}/web/server.js --no-open
+Restart=always
+RestartSec=5
+StandardOutput=append:${ROOT}/web-console.log
+StandardError=append:${ROOT}/web-console.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+echo "[OK] /etc/systemd/system/ke-web.service"
+echo
+
 # ---------- 启动 ----------
 systemctl daemon-reload
 systemctl enable --now "${SVC_NAME}"
+systemctl enable --now ke-web
 sleep 2
 
 echo "============================================"

@@ -123,7 +123,7 @@ ExecStart=/usr/bin/node /opt/ke-record/record-service/server.js
 Environment=NODE_ENV=production
 Environment=RECORD_PORT=3001
 Environment=RECORD_DIR=/opt/ke-record/record-service/downloads
-Environment=RECORD_TZ=8
+Environment=RECORD_TZ=0
 Environment=RECORD_CONCURRENCY=2
 
 Restart=always
@@ -180,7 +180,7 @@ tail -f /opt/ke-record/record-service/logs/stderr.log
 
 ---
 
-## 四、部署方案 B：装完整套件（三个服务）
+## 四、部署方案 B：装完整套件（四个服务）
 
 对应 **ke-camera-suite** 包。
 
@@ -245,7 +245,7 @@ sudo npm install --omit=dev
 sudo mkdir -p /opt/ke-camera/record-service/{logs,downloads}
 ```
 
-### 4.5 三个 systemd unit
+### 4.5 四个 systemd unit
 
 **① `ke-webrtc.service`**
 
@@ -308,7 +308,7 @@ WorkingDirectory=/opt/ke-camera/record-service
 ExecStart=/usr/bin/node /opt/ke-camera/record-service/server.js
 Environment=RECORD_PORT=3001
 Environment=RECORD_DIR=/opt/ke-camera/record-service/downloads
-Environment=RECORD_TZ=8
+Environment=RECORD_TZ=0
 Restart=always
 RestartSec=5
 StandardOutput=append:/opt/ke-camera/record-service/logs/stdout.log
@@ -319,16 +319,40 @@ WantedBy=multi-user.target
 EOF
 ```
 
+**④ `ke-web.service`（网页调试台，8080）**
+
+```bash
+sudo tee /etc/systemd/system/ke-web.service > /dev/null <<'EOF'
+[Unit]
+Description=KE Web Console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ke-camera
+ExecStart=/usr/bin/node /opt/ke-camera/web/server.js --no-open
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/ke-camera/web-console.log
+StandardError=append:/opt/ke-camera/web-console.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
 ### 4.6 启动全部
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now ke-webrtc ke-ptz ke-record
+sudo systemctl enable --now ke-webrtc ke-ptz ke-record ke-web
 
 # 查看状态
 systemctl status ke-webrtc --no-pager
 systemctl status ke-ptz    --no-pager
 systemctl status ke-record --no-pager
+systemctl status ke-web    --no-pager
 ```
 
 ### 4.7 验证
@@ -337,6 +361,7 @@ systemctl status ke-record --no-pager
 curl -s http://localhost:8000/          # webrtc-streamer 页面
 curl -s http://localhost:3000/health    # 云台服务
 curl -s http://localhost:3001/health    # 下载服务
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/   # 调试台
 ```
 
 ---

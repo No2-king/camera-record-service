@@ -1,20 +1,37 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 cd /d "%~dp0"
-title æ‘„åƒå¤´è°ƒè¯•å° - å…³é—­æœ¬çª—å£å³åœæ­¢
+title ÉãÏñÍ·µ÷ÊÔÌ¨ - ¹Ø±Õ±¾´°¿Ú¼´Í£Ö¹
 
 echo ============================================
-echo   æ‘„åƒå¤´è°ƒè¯•å°
+echo   ÉãÏñÍ·µ÷ÊÔÌ¨
 echo ============================================
 echo.
-echo  æ­£åœ¨å¯åŠ¨æœ¬åœ°ç½‘é¡µæœåŠ¡...
-echo  æµè§ˆå™¨ä¼šè‡ªåŠ¨æ‰“å¼€ http://localhost:8080
+echo  ÕýÔÚÆô¶¯±¾µØÍøÒ³·þÎñ...
+echo  ä¯ÀÀÆ÷´ò¿ª http://localhost:8080
 echo.
-echo  å…³é—­æœ¬çª—å£å³åœæ­¢æœåŠ¡ã€‚
+echo  ¹Ø±Õ±¾´°¿Ú¼´Í£Ö¹·þÎñ¡£
 echo.
 
-"%~dp0nodejs\node.exe" "%~dp0web\server.js"
+REM ---- Node.js£º±¾»ú»·¾³ÓÅÏÈ£¬°üÄÚ×Ô´ø¶µµ× ----
+call "%~dp0_find-node.bat"
+if not defined NODE_EXE (
+    echo  [´íÎó] Î´ÕÒµ½ Node.js ÔËÐÐÊ±
+    echo.
+    echo         Çë°²×° Node.js 18 »ò¸ü¸ß°æ±¾,
+    echo         »ò°Ñ node.exe ·Åµ½ %~dp0nodejs\node.exe
+    echo.
+    pause
+    exit /b 1
+)
+echo  Ê¹ÓÃ Node.js %NODE_VER%, À´Ô´: %NODE_SRC%
+echo.
+
+REM switch to UTF-8 so the node service banner shows correctly
+chcp 65001 >nul
+"%NODE_EXE%" "%~dp0web\server.js"
+chcp 936 >nul
 
 echo.
-echo æœåŠ¡å·²é€€å‡º.
+echo ·þÎñÒÑÍË³ö.
 pause

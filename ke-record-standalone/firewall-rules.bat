@@ -1,19 +1,19 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal
 REM ============================================================
-REM  å½•åƒä¸‹è½½æœåŠ¡ï¼ˆç‹¬ç«‹åŒ…ï¼‰â€”â€” Windows é˜²ç«å¢™è§„åˆ™
-REM  è¯·ã€ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œã€‘
+REM  Â¼ÏñÏÂÔØ·þÎñ£¨¶ÀÁ¢°ü£©¡ª¡ª Windows ·À»ðÇ½¹æÔò
+REM  Çë¡¾ÒÔ¹ÜÀíÔ±Éí·ÝÔËÐÐ¡¿
 REM
-REM  ç”¨æ³•:
-REM    firewall-rules.bat          æ·»åŠ è§„åˆ™ (æ”¾è¡Œ 3001)
-REM    firewall-rules.bat remove   åˆ é™¤è§„åˆ™
+REM  ÓÃ·¨:
+REM    firewall-rules.bat          Ìí¼Ó¹æÔò (·ÅÐÐ 3001 / 8080)
+REM    firewall-rules.bat remove   É¾³ý¹æÔò
 REM ============================================================
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo [é”™è¯¯] è¯·å³é”®é€‰æ‹©"ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ"æ‰§è¡Œæœ¬è„šæœ¬!
+    echo [´íÎó] ÇëÓÒ¼üÑ¡Ôñ"ÒÔ¹ÜÀíÔ±Éí·ÝÔËÐÐ"Ö´ÐÐ±¾½Å±¾£¡
     echo.
     pause
     exit /b 1
@@ -24,9 +24,11 @@ if /i "%~1"=="remove" set "MODE=delete"
 
 set "R1=Record-Service-TCP-In"
 set "R2=Record-Service-TCP-Out"
+set "R3=WebConsole-TCP-In"
+set "R4=WebConsole-TCP-Out"
 
 echo ============================================
-if /i "%MODE%"=="delete" (echo   åˆ é™¤é˜²ç«å¢™è§„åˆ™) else (echo   æ·»åŠ é˜²ç«å¢™è§„åˆ™)
+if /i "%MODE%"=="delete" (echo   É¾³ý·À»ðÇ½¹æÔò) else (echo   Ìí¼Ó·À»ðÇ½¹æÔò)
 echo ============================================
 echo.
 
@@ -34,27 +36,30 @@ if /i "%MODE%"=="delete" goto :DELETE
 
 netsh advfirewall firewall add rule name="%R1%" dir=in  action=allow protocol=TCP localport=3001
 netsh advfirewall firewall add rule name="%R2%" dir=out action=allow protocol=TCP localport=3001
+netsh advfirewall firewall add rule name="%R3%" dir=in  action=allow protocol=TCP localport=8080
+netsh advfirewall firewall add rule name="%R4%" dir=out action=allow protocol=TCP localport=8080
 
 echo.
 echo ============================================
-echo   é˜²ç«å¢™è§„åˆ™æ·»åŠ æˆåŠŸ
+echo   ·À»ðÇ½¹æÔòÌí¼Ó³É¹¦
 echo ============================================
-echo   TCP 3001   å½•åƒä¸‹è½½æœåŠ¡ API
+echo   TCP 3001   Â¼ÏñÏÂÔØ·þÎñ API
+echo   TCP 8080   ÍøÒ³µ÷ÊÔÌ¨
 echo ============================================
 echo.
-echo  å®‰å…¨æç¤º: ç”Ÿäº§çŽ¯å¢ƒå»ºè®®é™å®šç½‘æ®µ, å¯åœ¨è§„åˆ™åŽè¿½åŠ 
+echo  °²È«ÌáÊ¾: Éú²ú»·¾³½¨ÒéÏÞ¶¨Íø¶Î, ¿ÉÔÚ¹æÔòºó×·¼Ó
 echo            remoteip=localsubnet
 echo.
 pause
 exit /b 0
 
 :DELETE
-for %%R in ("%R1%" "%R2%") do (
+for %%R in ("%R1%" "%R2%" "%R3%" "%R4%") do (
     netsh advfirewall firewall delete rule name=%%~R >nul 2>&1
-    echo   å·²åˆ é™¤ %%~R
+    echo   ÒÑÉ¾³ý %%~R
 )
 echo.
 echo ============================================
-echo   é˜²ç«å¢™è§„åˆ™å·²å…¨éƒ¨åˆ é™¤
+echo   ·À»ðÇ½¹æÔòÒÑÈ«²¿É¾³ý
 echo ============================================
 pause

@@ -1,32 +1,54 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal EnableDelayedExpansion
 REM ============================================================
-REM  æ‘„åƒå¤´æœåŠ¡å¥—ä»¶ â€”â€” ä¸€é”®æ³¨å†Œä¸‰ä¸ª Windows æœåŠ¡
+REM  Camera service suite - register three Windows services
 REM
-REM    1. KE-WebRTCStreamer   å®æ—¶æ’­æ”¾   (webrtc-streamer)   ç«¯å£ 8000
-REM    2. KE-OnvifPtzService  äº‘å°æ§åˆ¶   (node server.js)    ç«¯å£ 3000
-REM    3. KE-RecordService    å½•åƒä¸‹è½½   (node server.js)    ç«¯å£ 3001
+REM    1. KE-WebRTCStreamer   live view    webrtc-streamer  :8000
+REM    2. KE-OnvifPtzService  PTZ control  node server.js   :3000
+REM    3. KE-RecordService    playback     node server.js   :3001
 REM
-REM  è¯·ä»¥ã€ç®¡ç†å‘˜èº«ä»½ã€‘è¿è¡Œæœ¬è„šæœ¬
+REM  Usage, right-click - Run as administrator:
+REM    install-service.bat          pre-check, register, start
+REM    install-service.bat check    pre-check only, changes nothing
+REM
+REM  Node.js runtime is resolved by _find-node.bat:
+REM    system PATH  ->  common install dirs  ->  bundled nodejs\node.exe
+REM  so the installer works both on machines that already have Node
+REM  and on machines that only carry the bundled runtime.
+REM
+REM  BATCH FILE RULES - please keep them, cmd.exe is fragile here:
+REM    1. Comments stay ASCII-only. cmd.exe can desync its byte
+REM       position on UTF-8 multi-byte comment lines and then run
+REM       fragments of them as commands.
+REM    2. Never put a half-width round bracket inside an echo line
+REM       that sits in an if/else block. The closing bracket ends
+REM       the block early and the rest leaks out as top-level
+REM       commands. Use full-width brackets or a comma instead.
 REM ============================================================
 
-REM ---- ç®¡ç†å‘˜æƒé™æ£€æŸ¥ ----
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo.
-    echo [é”™è¯¯] è¯·é€‰æ‹©"ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ"æ‰§è¡Œæœ¬è„šæœ¬!
-    echo.
-    pause
-    exit /b 1
+REM ---- argument: check mode ----
+set "CHECK_ONLY=0"
+if /i "%~1"=="check"  set "CHECK_ONLY=1"
+if /i "%~1"=="-check" set "CHECK_ONLY=1"
+
+REM ---- administrator check, skipped in check mode ----
+if "%CHECK_ONLY%"=="0" (
+    net session >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo.
+        echo [´íÎó] ÇëÓÒ¼üÑ¡Ôñ"ÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ"Ö´ĞĞ±¾½Å±¾£¡
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
-REM ---- ä»¥æœ¬è„šæœ¬æ‰€åœ¨ç›®å½•ä¸ºæ ¹ç›®å½• ----
+REM ---- root = directory of this script ----
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
 set "NSSM_EXE=%ROOT%\nssm\nssm.exe"
-set "NODE_EXE=%ROOT%\nodejs\node.exe"
 
 set "STREAMER_DIR=%ROOT%\webrtc-streamer"
 set "STREAMER_EXE=%ROOT%\webrtc-streamer\bin\webrtc-streamer.exe"
@@ -43,57 +65,166 @@ set "CONFIG_FILE=%ROOT%\config.json"
 set "STREAMER_SVC=KE-WebRTCStreamer"
 set "PTZ_SVC=KE-OnvifPtzService"
 set "REC_SVC=KE-RecordService"
+set "WEB_SVC=KE-WebConsole"
 
-REM ---- æ˜¯å¦ä½¿ç”¨ config.json é¢„æ³¨å†Œæ‘„åƒå¤´ ----
-REM  0 = åŠ¨æ€æ¨¡å¼ (é»˜è®¤) : RTSP åœ°å€ç”±å‰ç«¯ä¼ å…¥
-REM  1 = é¢„æ³¨å†Œæ¨¡å¼      : ä» config.json è¯»å–å›ºå®šæ‘„åƒå¤´åœ°å€
+REM ---- pre-register cameras from config.json? ----
+REM  0 = dynamic mode, default: RTSP url comes from the front end
+REM  1 = pre-registered mode   : fixed cameras read from config.json
 set "USE_CONFIG=0"
 
-REM ---- webrtc-streamer å¯åŠ¨å‚æ•° ----
+REM ---- webrtc-streamer arguments ----
 set "STREAMER_ARGS=-H 0.0.0.0:8000 -S -R 49152:65535 -o"
 if "%USE_CONFIG%"=="1" set "STREAMER_ARGS=%STREAMER_ARGS% -C ""%CONFIG_FILE%"""
 
 echo ============================================
-echo   æ‘„åƒå¤´æœåŠ¡å¥—ä»¶ - å®‰è£…
+echo   ÉãÏñÍ··şÎñÌ×¼ş - °²×°
 echo ============================================
 echo.
-echo  æ ¹ç›®å½•   : %ROOT%
-echo  é¢„æ³¨å†Œ   : %USE_CONFIG%  (0=åŠ¨æ€ 1=é¢„æ³¨å†Œ)
+echo  ¸ùÄ¿Â¼   : %ROOT%
+echo  Ô¤×¢²á   : %USE_CONFIG%  0=¶¯Ì¬ 1=Ô¤×¢²á
+if "%CHECK_ONLY%"=="1" echo  Ä£Ê½     : ½ö¼ì²é£¬²»»áĞŞ¸ÄÏµÍ³
 echo.
 
 REM ============================================================
-REM  å‰ç½®æ£€æŸ¥
+REM  [1/6] pre-flight check
 REM ============================================================
-echo [1/5] å‰ç½®æ£€æŸ¥...
+echo [1/6] Ç°ÖÃ¼ì²é...
 
-if not exist "%NSSM_EXE%"     ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° NSSM: %NSSM_EXE% & pause & exit /b 1 )
-if not exist "%NODE_EXE%"     ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° node.exe: %NODE_EXE% & pause & exit /b 1 )
-if not exist "%STREAMER_EXE%" ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° webrtc-streamer.exe: %STREAMER_EXE% & pause & exit /b 1 )
-if not exist "%PTZ_SCRIPT%"   ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° onvif-ptz\server.js & pause & exit /b 1 )
-if not exist "%REC_SCRIPT%"   ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° record-service\server.js & pause & exit /b 1 )
-
-if not exist "%PTZ_DIR%\node_modules" (
-    echo   [é”™è¯¯] onvif-ptz ä¾èµ–æœªå®‰è£…
-    echo          è¯·æ‰§è¡Œ: cd /d "%PTZ_DIR%" ^&^& "..\nodejs\npm.cmd" install
-    pause & exit /b 1
+if not exist "%NSSM_EXE%" (
+    echo   [´íÎó] ÕÒ²»µ½ NSSM: %NSSM_EXE%
+    pause
+    exit /b 1
 )
 
-if not exist "%REC_DIR%\logs" mkdir "%REC_DIR%\logs" >nul 2>&1
+REM ---- Node.js: local machine first, bundled runtime as fallback ----
+call "%ROOT%\_find-node.bat"
+
+if not defined NODE_EXE (
+    echo   [´íÎó] Î´ÕÒµ½ Node.js ÔËĞĞÊ±
+    echo.
+    echo          ÒÑ°´ÒÔÏÂË³Ğò²éÕÒ, ¾ùÎ´ÃüÖĞ:
+    echo            1. ÏµÍ³ PATH ÖĞµÄ node
+    echo            2. ³£¼û°²×°Ä¿Â¼, Èç Program Files\nodejs
+    echo            3. ±¾°üÄÚ %ROOT%\nodejs\node.exe
+    echo.
+    echo          ½â¾ö°ì·¨, ÈÎÑ¡ÆäÒ»:
+    echo            A. °²×° Node.js 18 »ò¸ü¸ß°æ±¾
+    echo               https://nodejs.org/zh-cn/download
+    echo            B. °Ñ node.exe ·Åµ½ÏÂÃæÕâ¸öÎ»ÖÃ
+    echo               %ROOT%\nodejs\node.exe
+    echo.
+    pause
+    exit /b 1
+)
+echo   [OK] Node.js %NODE_VER%   À´Ô´: %NODE_SRC%
+echo        %NODE_EXE%
+
+if defined NODE_MAJOR (
+    if !NODE_MAJOR! LSS 18 (
+        echo   [¾¯¸æ] Node.js °æ±¾Æ«µÍ, ½¨ÒéÊ¹ÓÃ 18 »ò¸ü¸ß°æ±¾
+    )
+)
+
+set "_NP=%NODE_EXE%"
+if not "!_NP:\Users\=!"=="!_NP!" (
+    echo   [ÌáÊ¾] node Î»ÓÚÓÃ»§Ä¿Â¼ÏÂ, ·şÎñÒÔ LocalSystem ÔËĞĞÊ±¿ÉÄÜÎŞÈ¨¶ÁÈ¡
+    echo          Èô·şÎñÆô¶¯Ê§°Ü, Çë¸ÄÓÃ Program Files ÏÂµÄ Node.js
+)
+
+REM ---- webrtc-streamer is optional, skip that one service if absent ----
+set "HAVE_STREAMER=1"
+if not exist "%STREAMER_EXE%" (
+    set "HAVE_STREAMER=0"
+    echo   [¾¯¸æ] Î´ÕÒµ½ webrtc-streamer.exe
+    echo          %STREAMER_EXE%
+    echo          ½«Ìø¹ı KE-WebRTCStreamer, ÆäÓàÁ½¸ö·şÎñÕÕ³£°²×°
+    echo          ĞèÒªÊµÊ±²¥·ÅÊ±, °Ñ webrtc-streamer ½âÑ¹µ½:
+    echo          %STREAMER_DIR%
+)
+
+if not exist "%PTZ_SCRIPT%" (
+    echo   [´íÎó] ÕÒ²»µ½ onvif-ptz\server.js
+    pause
+    exit /b 1
+)
+if not exist "%REC_SCRIPT%" (
+    echo   [´íÎó] ÕÒ²»µ½ record-service\server.js
+    pause
+    exit /b 1
+)
+
+REM ---- onvif-ptz dependencies ----
+REM  Check onvif, not just express. A half-finished npm install leaves
+REM  express present but onvif missing, and the service then dies with
+REM  "Cannot find module 'onvif'". That is exactly how a silent failure
+REM  turns into a crash loop, so verify both packages.
+if exist "%PTZ_DIR%\node_modules\onvif\package.json" if exist "%PTZ_DIR%\node_modules\express\package.json" (
+    echo   [OK] onvif-ptz ÒÀÀµÒÑ´æÔÚ
+    goto :deps_done
+)
+
+if not defined NPM_CMD (
+    echo   [´íÎó] onvif-ptz ÒÀÀµÎ´°²×°, ÇÒÕÒ²»µ½ npm
+    echo          Çë°²×°ÍêÕû°æ Node.js, Ğè°üº¬ npm, È»ºóÖ´ĞĞ:
+    echo            cd /d "%PTZ_DIR%"
+    echo            npm install
+    pause
+    exit /b 1
+)
+
+if "%CHECK_ONLY%"=="1" (
+    echo   [¾¯¸æ] onvif-ptz ÒÀÀµ²»ÍêÕû, ¼ì²éÄ£Ê½ÏÂ²»×Ô¶¯°²×°
+    echo          ÕıÊ½°²×°Ê±»á×Ô¶¯Ö´ĞĞ npm install
+    goto :deps_done
+)
+
+echo   ÕıÔÚ°²×° onvif-ptz ÒÀÀµ, Ê×´Î¿ÉÄÜĞèÒª¼¸·ÖÖÓ...
+pushd "%PTZ_DIR%"
+call "%NPM_CMD%" install --omit=dev --no-audit --no-fund
+set "NPM_RC=!errorlevel!"
+if not "!NPM_RC!"=="0" (
+    echo   [ÌáÊ¾] Ä¬ÈÏÔ´°²×°Ê§°Ü, ¸ÄÓÃ¹úÄÚ¾µÏñ npmmirror ÖØÊÔ...
+    call "%NPM_CMD%" install --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com
+    set "NPM_RC=!errorlevel!"
+)
+popd
+
+if not "!NPM_RC!"=="0" (
+    echo   [´íÎó] npm install Ê§°Ü, ÍË³öÂë !NPM_RC!
+    echo          ¿ÉÊÖ¶¯Ö´ĞĞ:
+    echo            cd /d "%PTZ_DIR%"
+    echo            npm install --registry=https://registry.npmmirror.com
+    pause
+    exit /b 1
+)
+if not exist "%PTZ_DIR%\node_modules\onvif\package.json" (
+    echo   [´íÎó] °²×°Íê³Éµ«ÈÔÈ±ÉÙ onvif Ä£¿é, ÒÀÀµ²»ÍêÕû
+    echo          ÇëÊÖ¶¯Ö´ĞĞ:
+    echo            cd /d "%PTZ_DIR%"
+    echo            npm install --registry=https://registry.npmmirror.com
+    pause
+    exit /b 1
+)
+echo   [OK] onvif-ptz ÒÀÀµ°²×°Íê³É
+
+:deps_done
+
+if not exist "%REC_DIR%\logs"      mkdir "%REC_DIR%\logs"      >nul 2>&1
 if not exist "%STREAMER_DIR%\logs" mkdir "%STREAMER_DIR%\logs" >nul 2>&1
-if not exist "%PTZ_DIR%\logs" mkdir "%PTZ_DIR%\logs" >nul 2>&1
+if not exist "%PTZ_DIR%\logs"      mkdir "%PTZ_DIR%\logs"      >nul 2>&1
 if not exist "%REC_DIR%\downloads" mkdir "%REC_DIR%\downloads" >nul 2>&1
 
-echo   [OK] æ£€æŸ¥é€šè¿‡
+echo   [OK] ¼ì²éÍ¨¹ı
 echo.
 
 REM ============================================================
-REM  ffmpeg æ£€æŸ¥
+REM  [2/6] ffmpeg
 REM ============================================================
-echo [2/5] æ£€æŸ¥ ffmpeg...
+echo [2/6] ¼ì²é ffmpeg...
 
 if not exist "%FFMPEG_EXE%" (
-    echo   [è­¦å‘Š] æœªæ‰¾åˆ° %FFMPEG_EXE%
-    echo          å½•åƒä¸‹è½½åŠŸèƒ½å°†ä¸å¯ç”¨, å…¶ä½™ä¸¤ä¸ªæœåŠ¡ä¸å—å½±å“
+    echo   [¾¯¸æ] Î´ÕÒµ½ %FFMPEG_EXE%
+    echo          Â¼ÏñÏÂÔØ¹¦ÄÜ½«²»¿ÉÓÃ, ÆäÓàÁ½¸ö·şÎñ²»ÊÜÓ°Ïì
     echo.
     goto :ffmpeg_done
 )
@@ -103,20 +234,25 @@ echo.
 :ffmpeg_done
 
 REM ============================================================
-REM  æ³¨å†Œ ffmpeg åˆ°ç³»ç»Ÿç¯å¢ƒå˜é‡
+REM  [3/6] register FFMPEG_PATH
 REM ============================================================
-echo [3/5] æ³¨å†Œ ffmpeg ç¯å¢ƒå˜é‡...
+echo [3/6] ×¢²á ffmpeg »·¾³±äÁ¿...
 
 if not exist "%FFMPEG_EXE%" (
-    echo   [è·³è¿‡] ffmpeg ä¸å­˜åœ¨
+    echo   [Ìø¹ı] ffmpeg ²»´æÔÚ
+    echo.
+    goto :env_done
+)
+if "%CHECK_ONLY%"=="1" (
+    echo   [Ìø¹ı] ¼ì²éÄ£Ê½
     echo.
     goto :env_done
 )
 
 setx /M FFMPEG_PATH "%FFMPEG_EXE%" >nul 2>&1
 if errorlevel 1 (
-    echo   [è­¦å‘Š] ç³»ç»Ÿç¯å¢ƒå˜é‡å†™å…¥å¤±è´¥, ä¸å½±å“æœåŠ¡è¿è¡Œ
-    echo          ä¸‰ä¸ªæœåŠ¡å‡å·²å•ç‹¬é…ç½® FFMPEG_PATH
+    echo   [¾¯¸æ] ÏµÍ³»·¾³±äÁ¿Ğ´ÈëÊ§°Ü, ²»Ó°Ïì·şÎñÔËĞĞ
+    echo          Èı¸ö·şÎñ¾ùÒÑµ¥¶ÀÅäÖÃ FFMPEG_PATH
 ) else (
     echo   [OK] FFMPEG_PATH = %FFMPEG_EXE%
 )
@@ -125,7 +261,28 @@ echo.
 :env_done
 
 REM ============================================================
-REM  æ¸…ç†åŒåæ—§æœåŠ¡
+REM  check mode stops here
+REM ============================================================
+if "%CHECK_ONLY%"=="1" (
+    echo ============================================
+    echo   ¼ì²éÄ£Ê½ - Î´×öÈÎºÎĞŞ¸Ä
+    echo ============================================
+    echo   Node.js          : %NODE_VER%   [%NODE_SRC%]
+    echo   node.exe         : %NODE_EXE%
+    echo   npm              : %NPM_CMD%
+    echo   webrtc-streamer  : %HAVE_STREAMER%   1=¿ÉÓÃ 0=È±Ê§
+    echo   onvif-ptz        : %PTZ_DIR%
+    echo   record-service   : %REC_DIR%
+    echo   ffmpeg           : %FFMPEG_EXE%
+    echo.
+    echo   È¥µô check ²ÎÊı¼´¿ÉÕıÊ½°²×°.
+    echo.
+    pause
+    exit /b 0
+)
+
+REM ============================================================
+REM  remove services with the same name
 REM ============================================================
 "%NSSM_EXE%" stop   %STREAMER_SVC% >nul 2>&1
 "%NSSM_EXE%" remove %STREAMER_SVC% confirm >nul 2>&1
@@ -135,31 +292,39 @@ REM ============================================================
 "%NSSM_EXE%" remove %REC_SVC%      confirm >nul 2>&1
 
 REM ============================================================
-REM  æ³¨å†Œä¸‰ä¸ªæœåŠ¡
+REM  [4/6] register services
 REM ============================================================
-echo [4/5] æ³¨å†ŒæœåŠ¡...
+echo [4/6] ×¢²á·şÎñ...
 
-echo   1) %STREAMER_SVC%  (å®æ—¶æ’­æ”¾ :8000)
-"%NSSM_EXE%" install %STREAMER_SVC% "%STREAMER_EXE%"
-"%NSSM_EXE%" set %STREAMER_SVC% AppParameters "%STREAMER_ARGS%"
-"%NSSM_EXE%" set %STREAMER_SVC% AppDirectory  "%STREAMER_DIR%"
-"%NSSM_EXE%" set %STREAMER_SVC% AppStdout     "%STREAMER_DIR%\logs\stdout.log"
-"%NSSM_EXE%" set %STREAMER_SVC% AppStderr     "%STREAMER_DIR%\logs\stderr.log"
-"%NSSM_EXE%" set %STREAMER_SVC% AppStdoutCreationDisposition 4
-"%NSSM_EXE%" set %STREAMER_SVC% AppStderrCreationDisposition 4
-"%NSSM_EXE%" set %STREAMER_SVC% AppRotateFiles 1
-"%NSSM_EXE%" set %STREAMER_SVC% AppRotateBytes 10485760
-"%NSSM_EXE%" set %STREAMER_SVC% Start SERVICE_AUTO_START
-"%NSSM_EXE%" set %STREAMER_SVC% AppExit Default Restart
-"%NSSM_EXE%" set %STREAMER_SVC% AppRestartDelay 5000
-"%NSSM_EXE%" set %STREAMER_SVC% AppThrottle 5000
-"%NSSM_EXE%" set %STREAMER_SVC% AppStopMethodConsole 15000
-echo      [OK]
+if "%HAVE_STREAMER%"=="1" (
+    echo   1. %STREAMER_SVC%  ÊµÊ±²¥·Å :8000
+    "%NSSM_EXE%" install %STREAMER_SVC% "%STREAMER_EXE%"
+    "%NSSM_EXE%" set %STREAMER_SVC% AppParameters "%STREAMER_ARGS%"
+    "%NSSM_EXE%" set %STREAMER_SVC% AppDirectory  "%STREAMER_DIR%"
+    "%NSSM_EXE%" set %STREAMER_SVC% DisplayName   "KE ÊµÊ±²¥·Å·şÎñ WebRTC"
+    "%NSSM_EXE%" set %STREAMER_SVC% Description   "RTSP to WebRTC, port 8000"
+    "%NSSM_EXE%" set %STREAMER_SVC% AppStdout     "%STREAMER_DIR%\logs\stdout.log"
+    "%NSSM_EXE%" set %STREAMER_SVC% AppStderr     "%STREAMER_DIR%\logs\stderr.log"
+    "%NSSM_EXE%" set %STREAMER_SVC% AppStdoutCreationDisposition 4
+    "%NSSM_EXE%" set %STREAMER_SVC% AppStderrCreationDisposition 4
+    "%NSSM_EXE%" set %STREAMER_SVC% AppRotateFiles 1
+    "%NSSM_EXE%" set %STREAMER_SVC% AppRotateBytes 10485760
+    "%NSSM_EXE%" set %STREAMER_SVC% Start SERVICE_AUTO_START
+    "%NSSM_EXE%" set %STREAMER_SVC% AppExit Default Restart
+    "%NSSM_EXE%" set %STREAMER_SVC% AppRestartDelay 5000
+    "%NSSM_EXE%" set %STREAMER_SVC% AppThrottle 5000
+    "%NSSM_EXE%" set %STREAMER_SVC% AppStopMethodConsole 15000
+    echo      [OK]
+) else (
+    echo   1. %STREAMER_SVC%  Ìø¹ı, È±ÉÙ webrtc-streamer.exe
+)
 
-echo   2) %PTZ_SVC%  (äº‘å°æ§åˆ¶ :3000)
+echo   2. %PTZ_SVC%  ÔÆÌ¨¿ØÖÆ :3000
 "%NSSM_EXE%" install %PTZ_SVC% "%NODE_EXE%"
 "%NSSM_EXE%" set %PTZ_SVC% AppParameters "\"%PTZ_SCRIPT%\""
 "%NSSM_EXE%" set %PTZ_SVC% AppDirectory  "%PTZ_DIR%"
+"%NSSM_EXE%" set %PTZ_SVC% DisplayName   "KE ÔÆÌ¨¿ØÖÆ·şÎñ ONVIF"
+"%NSSM_EXE%" set %PTZ_SVC% Description   "ONVIF PTZ control, port 3000"
 "%NSSM_EXE%" set %PTZ_SVC% AppStdout     "%PTZ_DIR%\logs\stdout.log"
 "%NSSM_EXE%" set %PTZ_SVC% AppStderr     "%PTZ_DIR%\logs\stderr.log"
 "%NSSM_EXE%" set %PTZ_SVC% AppStdoutCreationDisposition 4
@@ -173,10 +338,12 @@ echo   2) %PTZ_SVC%  (äº‘å°æ§åˆ¶ :3000)
 "%NSSM_EXE%" set %PTZ_SVC% AppStopMethodConsole 15000
 echo      [OK]
 
-echo   3) %REC_SVC%  (å½•åƒä¸‹è½½ :3001)
+echo   3. %REC_SVC%  Â¼ÏñÏÂÔØ :3001
 "%NSSM_EXE%" install %REC_SVC% "%NODE_EXE%"
 "%NSSM_EXE%" set %REC_SVC% AppParameters "\"%REC_SCRIPT%\""
 "%NSSM_EXE%" set %REC_SVC% AppDirectory  "%REC_DIR%"
+"%NSSM_EXE%" set %REC_SVC% DisplayName   "KE Â¼ÏñÏÂÔØ·şÎñ"
+"%NSSM_EXE%" set %REC_SVC% Description   "Hikvision record download, port 3001"
 "%NSSM_EXE%" set %REC_SVC% AppStdout     "%REC_DIR%\logs\stdout.log"
 "%NSSM_EXE%" set %REC_SVC% AppStderr     "%REC_DIR%\logs\stderr.log"
 "%NSSM_EXE%" set %REC_SVC% AppStdoutCreationDisposition 4
@@ -192,39 +359,61 @@ echo   3) %REC_SVC%  (å½•åƒä¸‹è½½ :3001)
 echo      [OK]
 echo.
 
+REM ---- 5/6 web console ----
+echo [5/6] ×¢²áÍøÒ³µ÷ÊÔÌ¨·şÎñ %WEB_SVC% ...
+"%NSSM_EXE%" install %WEB_SVC% "%NODE_EXE%"
+"%NSSM_EXE%" set %WEB_SVC% AppParameters "\"%ROOT%\web\server.js\" --no-open"
+"%NSSM_EXE%" set %WEB_SVC% AppDirectory  "%ROOT%"
+"%NSSM_EXE%" set %WEB_SVC% DisplayName   "KE ÉãÏñÍ·µ÷ÊÔÌ¨"
+"%NSSM_EXE%" set %WEB_SVC% Description   "Camera debug console static web server, port 8080"
+"%NSSM_EXE%" set %WEB_SVC% AppStdout     "%ROOT%\web-console.log"
+"%NSSM_EXE%" set %WEB_SVC% AppStderr     "%ROOT%\web-console.log"
+"%NSSM_EXE%" set %WEB_SVC% AppStdoutCreationDisposition 4
+"%NSSM_EXE%" set %WEB_SVC% AppStderrCreationDisposition 4
+"%NSSM_EXE%" set %WEB_SVC% AppRotateFiles 1
+"%NSSM_EXE%" set %WEB_SVC% AppRotateBytes 10485760
+"%NSSM_EXE%" set %WEB_SVC% Start SERVICE_AUTO_START
+"%NSSM_EXE%" set %WEB_SVC% AppExit Default Restart
+"%NSSM_EXE%" set %WEB_SVC% AppRestartDelay 5000
+"%NSSM_EXE%" set %WEB_SVC% AppThrottle 5000
+echo      [OK]
+echo.
+
 REM ============================================================
-REM  å¯åŠ¨æœåŠ¡
+REM  [6/6] start services
 REM ============================================================
-echo [5/5] å¯åŠ¨æœåŠ¡...
-"%NSSM_EXE%" start %STREAMER_SVC%
+echo [6/6] Æô¶¯·şÎñ...
+if "%HAVE_STREAMER%"=="1" "%NSSM_EXE%" start %STREAMER_SVC%
 "%NSSM_EXE%" start %PTZ_SVC%
 "%NSSM_EXE%" start %REC_SVC%
+"%NSSM_EXE%" start %WEB_SVC%
 echo.
 ping -n 5 127.0.0.1 >nul 2>&1
 
 echo ============================================
-echo   å®‰è£…å®Œæˆ - æœåŠ¡çŠ¶æ€
+echo   °²×°Íê³É - ·şÎñ×´Ì¬
 echo ============================================
-"%NSSM_EXE%" status %STREAMER_SVC%
-echo.
+if "%HAVE_STREAMER%"=="1" "%NSSM_EXE%" status %STREAMER_SVC%
 "%NSSM_EXE%" status %PTZ_SVC%
-echo.
 "%NSSM_EXE%" status %REC_SVC%
+"%NSSM_EXE%" status %WEB_SVC%
 echo.
 echo ============================================
-echo   è®¿é—®åœ°å€
+echo   ·ÃÎÊµØÖ·
 echo ============================================
-echo   å®æ—¶æ’­æ”¾       : http://localhost:8000
-echo   äº‘å°æ§åˆ¶å¥åº·   : http://localhost:3000/health
-echo   å½•åƒä¸‹è½½é¦–é¡µ   : http://localhost:3001
-echo   ä¸‹è½½å¥åº·æ£€æŸ¥   : http://localhost:3001/health
+if "%HAVE_STREAMER%"=="1" echo   ÊµÊ±²¥·Å       : http://localhost:8000
+echo   ÔÆÌ¨¿ØÖÆ½¡¿µ   : http://localhost:3000/health
+echo   ÍøÒ³µ÷ÊÔÌ¨     : http://localhost:8080
+echo   Â¼ÏñÏÂÔØÊ×Ò³   : http://localhost:3001
+echo   ÏÂÔØ½¡¿µ¼ì²é   : http://localhost:3001/health
 echo.
-echo   æç¤º: å¤–éƒ¨æµè§ˆå™¨è®¿é—®ä¸äº†, è¯·ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ
-echo         firewall-rules.bat æ”¾è¡Œç«¯å£.
+echo   ÌáÊ¾: Íâ²¿ä¯ÀÀÆ÷·ÃÎÊ²»ÁË, ÇëÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ
+echo         firewall-rules.bat ·ÅĞĞ¶Ë¿Ú.
 echo.
-echo   ç®¡ç†å‘½ä»¤:
-echo     nssm restart %STREAMER_SVC%
+echo   ¹ÜÀíÃüÁî:
 echo     nssm restart %PTZ_SVC%
 echo     nssm restart %REC_SVC%
+echo     nssm restart %WEB_SVC%
+if "%HAVE_STREAMER%"=="1" echo     nssm restart %STREAMER_SVC%
 echo.
 pause

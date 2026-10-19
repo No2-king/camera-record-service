@@ -71,15 +71,38 @@ const okFile = (p) => {
     try { return fs.existsSync(p) && fs.statSync(p).size > 0; } catch { return false; }
 };
 
-/** 海康 PS 流 -> mp4。先无损封装，不行再降级转码 */
-async function toMp4(input, output) {
+/** 海康 PS 流 -> mp4。先无损封装，不行再降级转码
+ *
+ * @param {string} input  已剥掉 IMKH 头的纯 PS 文件
+ * @param {string} output 目标 mp4
+ * @param {{offsetSec?:number, durSec?:number}} [opts] 裁剪区间（相对该段开头）
+ *
+ * 为什么第一档就 -an：
+ *   设备上没接麦克风时，PS 里那轨 mp2 是 0 声道空轨，
+ *   mp4 封装器会直接报 "sample rate not set / Could not write header" 而失败。
+ *   录像本身只有画面，直接丢掉音频轨最稳，也不损失任何有用内容。
+ */
+async function toMp4(input, output, opts = {}) {
+    const { offsetSec = 0, durSec = 0 } = opts;
+
+    // -ss 必须放在 -i 前面才是「输入定位」（快速 seek，PS 文件才不用从头解码）
+    // -t 必须放在 -i 后面才是「输出限长」
+    //   —— 放在 -i 前面时实测不生效，会把整段都封出来（踩过）
+    const seekIn = offsetSec > 0.05 ? ['-ss', offsetSec.toFixed(3)] : [];
+    const limitOut = durSec > 0.05 ? ['-t', durSec.toFixed(3)] : [];
+
+    const tail = ['-movflags', '+faststart'];
     const attempts = [
-        ['-c', 'copy', '-tag:v', 'hvc1'],
-        ['-c:v', 'copy', '-c:a', 'aac'],
-        ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-c:a', 'aac'],
+        [...seekIn, '-i', input, ...limitOut,
+            '-map', '0:v:0', '-c', 'copy', '-an', '-tag:v', 'hvc1', ...tail],
+        [...seekIn, '-i', input, ...limitOut,
+            '-c', 'copy', '-tag:v', 'hvc1', ...tail],
+        [...seekIn, '-i', input, ...limitOut,
+            '-map', '0:v:0', '-c:v', 'libx264',
+            '-preset', 'veryfast', '-crf', '23', '-an', ...tail],
     ];
     for (const extra of attempts) {
-        const code = await run(['-hide_banner', '-loglevel', 'error', '-y', '-i', input, ...extra, output]);
+        const code = await run(['-hide_banner', '-loglevel', 'error', '-y', ...extra, output]);
         if (code === 0 && okFile(output)) return true;
     }
     return false;
@@ -103,7 +126,8 @@ async function concat(parts, output) {
     } catch { return false; }
 
     const code = await run(['-hide_banner', '-loglevel', 'error', '-y',
-        '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', output]);
+        '-f', 'concat', '-safe', '0', '-i', listFile,
+        '-c', 'copy', '-movflags', '+faststart', output]);
 
     try { fs.unlinkSync(listFile); } catch { /* ignore */ }
 
@@ -114,7 +138,8 @@ async function concat(parts, output) {
 async function pullRtsp(rtspUrl, output, onSeconds) {
     const code = await run(['-hide_banner', '-loglevel', 'info', '-y',
         '-rtsp_transport', 'tcp', '-i', rtspUrl,
-        '-c', 'copy', '-tag:v', 'hvc1', output], onSeconds);
+        '-map', '0:v:0', '-c', 'copy', '-an', '-tag:v', 'hvc1',
+        '-movflags', '+faststart', output], onSeconds);
     return code === 0 && okFile(output);
 }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  摄像头服务套件 —— Linux 一键安装（三个服务）
+#  摄像头服务套件 —— Linux 一键安装（四个服务）
 #
 #  用法:  sudo bash linux/install.sh
 #
@@ -8,11 +8,12 @@
 #     ke-webrtc   :8000   实时播放  (webrtc-streamer)
 #     ke-ptz      :3000   云台控制  (Node + onvif)
 #     ke-record   :3001   录像下载  (Node, 零依赖)
+#     ke-web      :8080   网页调试台 (Node, 零依赖)
 #
 #  特性:
 #   · 就地部署 —— 包放在哪就在哪跑
 #   · 自动探测 node / ffmpeg, 自动 npm install
-#   · 自动生成三个 systemd 服务并开机自启
+#   · 自动生成四个 systemd 服务并开机自启
 # ============================================================
 set -euo pipefail
 
@@ -61,7 +62,7 @@ echo
 #  服务①  webrtc-streamer
 # ============================================================
 echo "--------------------------------------------"
-echo " [1/3] webrtc-streamer  (:8000)"
+echo " [1/4] webrtc-streamer  (:8000)"
 echo "--------------------------------------------"
 
 HAVE_STREAMER=0
@@ -89,7 +90,7 @@ echo
 #  服务②  onvif-ptz
 # ============================================================
 echo "--------------------------------------------"
-echo " [2/3] onvif-ptz  (:3000)"
+echo " [2/4] onvif-ptz  (:3000)"
 echo "--------------------------------------------"
 
 [[ -f "${PTZ_DIR}/server.js" ]] || { echo "[错误] 缺少 ${PTZ_DIR}/server.js"; exit 1; }
@@ -113,7 +114,7 @@ echo
 #  服务③  record-service
 # ============================================================
 echo "--------------------------------------------"
-echo " [3/3] record-service  (:3001)"
+echo " [3/4] record-service  (:3001)"
 echo "--------------------------------------------"
 
 [[ -f "${REC_DIR}/server.js" ]] || { echo "[错误] 缺少 ${REC_DIR}/server.js"; exit 1; }
@@ -182,7 +183,7 @@ WorkingDirectory=${REC_DIR}
 ExecStart=${NODE_BIN} ${REC_DIR}/server.js
 Environment=RECORD_PORT=3001
 Environment=RECORD_DIR=${REC_DIR}/downloads
-Environment=RECORD_TZ=8
+Environment=RECORD_TZ=0
 Restart=always
 RestartSec=5
 StandardOutput=append:${REC_DIR}/logs/stdout.log
@@ -192,6 +193,27 @@ StandardError=append:${REC_DIR}/logs/stderr.log
 WantedBy=multi-user.target
 EOF
 echo "[OK] /etc/systemd/system/ke-record.service"
+echo
+
+cat > /etc/systemd/system/ke-web.service <<EOF
+[Unit]
+Description=KE Web Console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${ROOT}
+ExecStart=${NODE_BIN} ${ROOT}/web/server.js --no-open
+Restart=always
+RestartSec=5
+StandardOutput=append:${ROOT}/web-console.log
+StandardError=append:${ROOT}/web-console.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+echo "[OK] /etc/systemd/system/ke-web.service"
 echo
 
 # ============================================================
@@ -204,6 +226,7 @@ if [[ "${HAVE_STREAMER}" -eq 1 ]]; then
 fi
 systemctl enable --now ke-ptz
 systemctl enable --now ke-record
+systemctl enable --now ke-web
 
 sleep 2
 
@@ -218,6 +241,8 @@ systemctl status ke-ptz    --no-pager | head -5 || true
 echo
 systemctl status ke-record --no-pager | head -5 || true
 echo
+systemctl status ke-web    --no-pager | head -5 || true
+echo
 
 echo "============================================"
 echo "  安装完成"
@@ -226,13 +251,15 @@ echo "============================================"
 echo "  云台健康   : http://localhost:3000/health"
 echo "  下载首页   : http://localhost:3001"
 echo "  下载健康   : http://localhost:3001/health"
+echo "  调试台     : http://localhost:8080"
 echo
 echo "  管理命令:"
 [[ "${HAVE_STREAMER}" -eq 1 ]] && echo "    systemctl restart ke-webrtc"
 echo "    systemctl restart ke-ptz"
 echo "    systemctl restart ke-record"
+echo "    systemctl restart ke-web"
 echo
 echo "  防火墙 (局域网访问需要):"
-echo "    sudo ufw allow 8000/tcp 3000/tcp 3001/tcp 3478/tcp 3478/udp"
+echo "    sudo ufw allow 8000/tcp 3000/tcp 3001/tcp 8080/tcp 3478/tcp 3478/udp"
 echo "    sudo ufw allow 49152:65535/udp"
 echo

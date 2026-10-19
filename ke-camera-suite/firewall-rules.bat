@@ -1,19 +1,19 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal
 REM ============================================================
-REM  æ‘„åƒå¤´æœåŠ¡å¥—ä»¶ â€”â€” Windows é˜²ç«å¢™è§„åˆ™ç®¡ç†
-REM  ä»¥ ç®¡ç†å‘˜èº«ä»½è¿è¡Œ æ‰§è¡Œæœ¬è„šæœ¬
+REM  ÉãÏñÍ··þÎñÌ×¼þ ¡ª¡ª Windows ·À»ðÇ½¹æÔò¹ÜÀí
+REM  ÒÔ ¹ÜÀíÔ±Éí·ÝÔËÐÐ Ö´ÐÐ±¾½Å±¾
 REM
-REM  ç”¨æ³•:
-REM    firewall-rules.bat          æ·»åŠ è§„åˆ™
-REM    firewall-rules.bat remove   åˆ é™¤è§„åˆ™
+REM  ÓÃ·¨:
+REM    firewall-rules.bat          Ìí¼Ó¹æÔò
+REM    firewall-rules.bat remove   É¾³ý¹æÔò
 REM ============================================================
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo [é”™è¯¯] è¯·é€‰æ‹©"ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ"æ‰§è¡Œæœ¬è„šæœ¬!
+    echo [´íÎó] ÇëÑ¡Ôñ"ÒÔ¹ÜÀíÔ±Éí·ÝÔËÐÐ"Ö´ÐÐ±¾½Å±¾£¡
     echo.
     pause
     exit /b 1
@@ -32,15 +32,17 @@ set "R7=Onvif-PTZ-TCP-In"
 set "R8=Onvif-PTZ-TCP-Out"
 set "R9=Record-Service-TCP-In"
 set "R10=Record-Service-TCP-Out"
+set "R11=WebConsole-TCP-In"
+set "R12=WebConsole-TCP-Out"
 
 echo ============================================
-if /i "%MODE%"=="delete" (echo   åˆ é™¤é˜²ç«å¢™è§„åˆ™) else (echo   æ·»åŠ é˜²ç«å¢™è§„åˆ™)
+if /i "%MODE%"=="delete" (echo   É¾³ý·À»ðÇ½¹æÔò) else (echo   Ìí¼Ó·À»ðÇ½¹æÔò)
 echo ============================================
 echo.
 
 if /i "%MODE%"=="delete" goto :DELETE
 
-REM ---------------- æ·»åŠ è§„åˆ™ ----------------
+REM ---------------- Ìí¼Ó¹æÔò ----------------
 netsh advfirewall firewall add rule name="%R1%" dir=in  action=allow protocol=TCP localport=8000,3478
 netsh advfirewall firewall add rule name="%R2%" dir=out action=allow protocol=TCP localport=8000,3478
 netsh advfirewall firewall add rule name="%R3%" dir=in  action=allow protocol=UDP localport=3478
@@ -51,31 +53,34 @@ netsh advfirewall firewall add rule name="%R7%" dir=in  action=allow protocol=TC
 netsh advfirewall firewall add rule name="%R8%" dir=out action=allow protocol=TCP localport=3000
 netsh advfirewall firewall add rule name="%R9%" dir=in  action=allow protocol=TCP localport=3001
 netsh advfirewall firewall add rule name="%R10%" dir=out action=allow protocol=TCP localport=3001
+netsh advfirewall firewall add rule name="%R11%" dir=in  action=allow protocol=TCP localport=8080
+netsh advfirewall firewall add rule name="%R12%" dir=out action=allow protocol=TCP localport=8080
 
 echo.
 echo ============================================
-echo   é˜²ç«å¢™è§„åˆ™æ·»åŠ æˆåŠŸ
+echo   ·À»ðÇ½¹æÔòÌí¼Ó³É¹¦
 echo ============================================
-echo   TCP 8000         webrtc-streamer ç½‘é¡µä¸Ž API
-echo   TCP/UDP 3478     å†…ç½® STUN æœåŠ¡å™¨
-echo   UDP 49152-65535  WebRTC åª’ä½“æµç«¯å£èŒƒå›´
-echo   TCP 3000         ONVIF PTZ äº‘å°æŽ§åˆ¶ API
-echo   TCP 3001         å½•åƒä¸‹è½½æœåŠ¡ API
+echo   TCP 8000         webrtc-streamer ÍøÒ³Óë API
+echo   TCP/UDP 3478     ÄÚÖÃ STUN ·þÎñÆ÷
+echo   UDP 49152-65535  WebRTC Ã½ÌåÁ÷¶Ë¿Ú·¶Î§
+echo   TCP 3000         ONVIF PTZ ÔÆÌ¨¿ØÖÆ API
+echo   TCP 3001         Â¼ÏñÏÂÔØ·þÎñ API
+echo   TCP 8080         ÍøÒ³µ÷ÊÔÌ¨£¨¾ÖÓòÍøÆäËü»úÆ÷·ÃÎÊÓÃÕâ¸ö£©
 echo ============================================
 echo.
-echo  å®‰å…¨æç¤º: ç”Ÿäº§çŽ¯å¢ƒä½¿ç”¨æ—¶, å»ºè®®å°†è§„åˆ™é™å®šä¸º
-echo            æœ¬ç½‘æ®µ, å¯åœ¨è§„åˆ™åŽè¿½åŠ  remoteip=localsubnet
+echo  °²È«ÌáÊ¾: Éú²ú»·¾³Ê¹ÓÃÊ±, ½¨Òé½«¹æÔòÏÞ¶¨Îª
+echo            ±¾Íø¶Î, ¿ÉÔÚ¹æÔòºó×·¼Ó remoteip=localsubnet
 echo.
 pause
 exit /b 0
 
 :DELETE
-for %%R in ("%R1%" "%R2%" "%R3%" "%R4%" "%R5%" "%R6%" "%R7%" "%R8%" "%R9%" "%R10%") do (
+for %%R in ("%R1%" "%R2%" "%R3%" "%R4%" "%R5%" "%R6%" "%R7%" "%R8%" "%R9%" "%R10%" "%R11%" "%R12%") do (
     netsh advfirewall firewall delete rule name=%%~R >nul 2>&1
-    echo   å·²åˆ é™¤ %%~R
+    echo   ÒÑÉ¾³ý %%~R
 )
 echo.
 echo ============================================
-echo   é˜²ç«å¢™è§„åˆ™å·²å…¨éƒ¨åˆ é™¤
+echo   ·À»ðÇ½¹æÔòÒÑÈ«²¿É¾³ý
 echo ============================================
 pause

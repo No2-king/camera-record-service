@@ -13,26 +13,27 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-SVC_NAME="ke-record"
-UNIT="/etc/systemd/system/${SVC_NAME}.service"
-
 echo "============================================"
 echo "  卸载录像下载服务"
 echo "============================================"
 echo
 
-if systemctl list-unit-files | grep -q "^${SVC_NAME}.service"; then
-    systemctl stop    "${SVC_NAME}" 2>/dev/null || true
-    systemctl disable "${SVC_NAME}" 2>/dev/null || true
-    echo "[OK] 已停止并禁用 ${SVC_NAME}"
-else
-    echo "[跳过] ${SVC_NAME} 未注册"
-fi
+for SVC_NAME in ke-record ke-web; do
+    UNIT="/etc/systemd/system/${SVC_NAME}.service"
 
-if [[ -f "${UNIT}" ]]; then
-    rm -f "${UNIT}"
-    echo "[OK] 已删除 ${UNIT}"
-fi
+    if systemctl list-unit-files | grep -q "^${SVC_NAME}.service"; then
+        systemctl stop    "${SVC_NAME}" 2>/dev/null || true
+        systemctl disable "${SVC_NAME}" 2>/dev/null || true
+        echo "[OK] 已停止并禁用 ${SVC_NAME}"
+    else
+        echo "[跳过] ${SVC_NAME} 未注册"
+    fi
+
+    if [[ -f "${UNIT}" ]]; then
+        rm -f "${UNIT}"
+        echo "[OK] 已删除 ${UNIT}"
+    fi
+done
 
 systemctl daemon-reload
 

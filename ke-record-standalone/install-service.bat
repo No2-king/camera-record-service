@@ -1,73 +1,141 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal EnableDelayedExpansion
 REM ============================================================
-REM  å½•åƒä¸‹è½½æœåŠ¡ï¼ˆç‹¬ç«‹åŒ…ï¼‰â€”â€” ä¸€é”®æ³¨å†Œ Windows æœåŠ¡
+REM  Â¼ÏñÏÂÔØ·þÎñ£¨¶ÀÁ¢°ü£©- Ò»¼ü×¢²á Windows ·þÎñ
 REM
-REM    æœåŠ¡å : KE-RecordService
-REM    ç«¯å£   : 3001
+REM    ·þÎñÃû : KE-RecordService
+REM    ¶Ë¿Ú   : 3001
 REM
-REM  Â· æœ¬è„šæœ¬å¯æ”¾åœ¨ä»»æ„è·¯å¾„, è‡ªåŠ¨ä»¥ã€Œè„šæœ¬æ‰€åœ¨ç›®å½•ã€ä¸ºæ ¹ç›®å½•
-REM  Â· æ‰€æœ‰éœ€è¦çš„æ–‡ä»¶å·²éšåŒ…è‡ªå¸¦ (Node è¿è¡Œæ—¶ / NSSM / ffmpeg)
-REM  Â· æ— éœ€æ‰‹å·¥é…ç½®ä»»ä½•ä¸œè¥¿, ä¹Ÿæ— éœ€è”ç½‘
-REM  Â· è¯·ã€ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œã€‘
+REM  ÓÃ·¨£¨ÓÒ¼ü - ÒÔ¹ÜÀíÔ±Éí·ÝÔËÐÐ£©:
+REM    install-service.bat          ¼ì²é + ×¢²á + Æô¶¯
+REM    install-service.bat check    Ö»×öÇ°ÖÃ¼ì²é£¬²»¸Ä¶¯ÏµÍ³
+REM
+REM  Node.js ÔËÐÐÊ±ÓÉ _find-node.bat ¶¨Î»£¬²éÕÒË³Ðò£º
+REM    ÏµÍ³ PATH  ->  ±¾»ú³£¼û°²×°Ä¿Â¼  ->  ±¾°üÄÚ nodejs\node.exe
+REM  ËùÒÔ±¾»ú×°¹ý Node ¾ÍÖ±½ÓÓÃ£¬Ã»×°²ÅÓÃ°üÄÚ×Ô´øµÄÔËÐÐÊ±¡£
+REM
+REM  Åú´¦ÀíÎÄ¼þ×¢ÒâÊÂÏî£¬ÇëÎðÆÆ»µ£º
+REM    1. ±¾ÎÄ¼þ±£´æÎª GBK ±àÂë¡£UTF-8 ÖÐÎÄÔÚ cmd ÏÂ»á±»°´
+REM       ANSI ¶ÁÈ¡¶øÓë ASCII ×Ö½Ú´íÎ»£¬µ¼ÖÂÕûÐÐ±»Îóµ±³ÉÃüÁî¡£
+REM    2. echo ÐÐÀï²»Òª³öÏÖ°ë½ÇÔ²À¨ºÅ¡£ËüÔÚ if ¿éÖÐ»áÌáÇ°±ÕºÏ
+REM       ´úÂë¿é£¬Ê¹ºóÃæµÄÓï¾äÂ©µ½¿éÍâÖ´ÐÐ¡£
 REM ============================================================
 
-REM ---- ç®¡ç†å‘˜æƒé™æ£€æŸ¥ ----
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo.
-    echo [é”™è¯¯] è¯·å³é”®é€‰æ‹©"ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ"æ‰§è¡Œæœ¬è„šæœ¬!
-    echo.
-    pause
-    exit /b 1
+REM ---- ²ÎÊý£º¼ì²éÄ£Ê½ ----
+set "CHECK_ONLY=0"
+if /i "%~1"=="check"  set "CHECK_ONLY=1"
+if /i "%~1"=="-check" set "CHECK_ONLY=1"
+
+REM ---- ¹ÜÀíÔ±È¨ÏÞ¼ì²é£¬¼ì²éÄ£Ê½Ìø¹ý ----
+if "%CHECK_ONLY%"=="0" (
+    net session >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo.
+        echo [´íÎó] ÇëÓÒ¼üÑ¡Ôñ"ÒÔ¹ÜÀíÔ±Éí·ÝÔËÐÐ"Ö´ÐÐ±¾½Å±¾£¡
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
-REM ---- ä»¥æœ¬è„šæœ¬æ‰€åœ¨ç›®å½•ä¸ºæ ¹ç›®å½•ï¼ˆå…³é”®: ä¿è¯æ•´ä¸ªæ–‡ä»¶å¤¹å¯ä»»æ„æ¬è¿ï¼‰----
+REM ---- ÒÔ±¾½Å±¾ËùÔÚÄ¿Â¼Îª¸ùÄ¿Â¼£¬±£Ö¤Õû¸öÎÄ¼þ¼Ð¿ÉÈÎÒâ°áÔË ----
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
 set "NSSM_EXE=%ROOT%\nssm\nssm.exe"
-set "NODE_EXE=%ROOT%\nodejs\node.exe"
 set "REC_DIR=%ROOT%\record-service"
 set "REC_SCRIPT=%ROOT%\record-service\server.js"
 set "FFMPEG_EXE=%ROOT%\tools\ffmpeg.exe"
 set "REC_SVC=KE-RecordService"
+set "WEB_SVC=KE-WebConsole"
 set "RECORD_PORT=3001"
 
 echo ============================================
-echo   å½•åƒä¸‹è½½æœåŠ¡ - å®‰è£…
+echo   Â¼ÏñÏÂÔØ·þÎñ - °²×°
 echo ============================================
 echo.
-echo  æ ¹ç›®å½• : %ROOT%
-echo  ç«¯å£   : %RECORD_PORT%
+echo  ¸ùÄ¿Â¼ : %ROOT%
+echo  ¶Ë¿Ú   : %RECORD_PORT%
+if "%CHECK_ONLY%"=="1" echo  Ä£Ê½   : ½ö¼ì²é£¬²»»áÐÞ¸ÄÏµÍ³
 echo.
 
 REM ============================================================
-REM  [1/5] å‰ç½®æ£€æŸ¥
+REM  [1/6] Ç°ÖÃ¼ì²é
 REM ============================================================
-echo [1/5] å‰ç½®æ£€æŸ¥...
+echo [1/6] Ç°ÖÃ¼ì²é...
 
-if not exist "%NSSM_EXE%"   ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° NSSM  : %NSSM_EXE%   & pause & exit /b 1 )
-if not exist "%NODE_EXE%"   ( echo   [é”™è¯¯] æ‰¾ä¸åˆ° Node  : %NODE_EXE%   & pause & exit /b 1 )
-if not exist "%REC_SCRIPT%" ( echo   [é”™è¯¯] æ‰¾ä¸åˆ°æœåŠ¡ä»£ç : %REC_SCRIPT% & pause & exit /b 1 )
-if not exist "%REC_DIR%\lib\isapi.js"  ( echo   [é”™è¯¯] ç¼ºå°‘ %REC_DIR%\lib\isapi.js  & pause & exit /b 1 )
-if not exist "%REC_DIR%\lib\ffmpeg.js" ( echo   [é”™è¯¯] ç¼ºå°‘ %REC_DIR%\lib\ffmpeg.js & pause & exit /b 1 )
+if not exist "%NSSM_EXE%" (
+    echo   [´íÎó] ÕÒ²»µ½ NSSM: %NSSM_EXE%
+    pause
+    exit /b 1
+)
+
+REM ---- Node.js£º±¾»ú»·¾³ÓÅÏÈ£¬°üÄÚ×Ô´ø¶µµ× ----
+call "%ROOT%\_find-node.bat"
+
+if not defined NODE_EXE (
+    echo   [´íÎó] Î´ÕÒµ½ Node.js ÔËÐÐÊ±
+    echo.
+    echo          ÒÑ°´ÒÔÏÂË³Ðò²éÕÒ, ¾ùÎ´ÃüÖÐ:
+    echo            1. ÏµÍ³ PATH ÖÐµÄ node
+    echo            2. ³£¼û°²×°Ä¿Â¼, Èç Program Files\nodejs
+    echo            3. ±¾°üÄÚ %ROOT%\nodejs\node.exe
+    echo.
+    echo          ½â¾ö°ì·¨, ÈÎÑ¡ÆäÒ»:
+    echo            A. °²×° Node.js 18 »ò¸ü¸ß°æ±¾
+    echo               https://nodejs.org/zh-cn/download
+    echo            B. °Ñ node.exe ·Åµ½ÏÂÃæÕâ¸öÎ»ÖÃ
+    echo               %ROOT%\nodejs\node.exe
+    echo.
+    pause
+    exit /b 1
+)
+echo   [OK] Node.js %NODE_VER%   À´Ô´: %NODE_SRC%
+echo        %NODE_EXE%
+
+if defined NODE_MAJOR (
+    if !NODE_MAJOR! LSS 18 (
+        echo   [¾¯¸æ] Node.js °æ±¾Æ«µÍ, ½¨ÒéÊ¹ÓÃ 18 »ò¸ü¸ß°æ±¾
+    )
+)
+
+set "_NP=%NODE_EXE%"
+if not "!_NP:\Users\=!"=="!_NP!" (
+    echo   [ÌáÊ¾] node Î»ÓÚÓÃ»§Ä¿Â¼ÏÂ, ·þÎñÒÔ LocalSystem ÔËÐÐÊ±¿ÉÄÜÎÞÈ¨¶ÁÈ¡
+    echo          Èô·þÎñÆô¶¯Ê§°Ü, Çë¸ÄÓÃ Program Files ÏÂµÄ Node.js
+)
+
+if not exist "%REC_SCRIPT%" (
+    echo   [´íÎó] ÕÒ²»µ½·þÎñ´úÂë: %REC_SCRIPT%
+    pause
+    exit /b 1
+)
+if not exist "%REC_DIR%\lib\isapi.js" (
+    echo   [´íÎó] È±ÉÙ %REC_DIR%\lib\isapi.js
+    pause
+    exit /b 1
+)
+if not exist "%REC_DIR%\lib\ffmpeg.js" (
+    echo   [´íÎó] È±ÉÙ %REC_DIR%\lib\ffmpeg.js
+    pause
+    exit /b 1
+)
 
 if not exist "%REC_DIR%\logs"      mkdir "%REC_DIR%\logs"      >nul 2>&1
 if not exist "%REC_DIR%\downloads" mkdir "%REC_DIR%\downloads" >nul 2>&1
 
-echo   [OK] æ£€æŸ¥é€šè¿‡
+echo   [OK] ¼ì²éÍ¨¹ý
 echo.
 
 REM ============================================================
-REM  [2/5] æ£€æŸ¥ ffmpegï¼ˆéšåŒ…è‡ªå¸¦ï¼‰
+REM  [2/6] ¼ì²é ffmpeg
 REM ============================================================
-echo [2/5] æ£€æŸ¥ ffmpeg...
+echo [2/6] ¼ì²é ffmpeg...
 
 if not exist "%FFMPEG_EXE%" (
-    echo   [è­¦å‘Š] æœªæ‰¾åˆ° %FFMPEG_EXE%
-    echo          ä¸‹è½½åŠŸèƒ½å°†ä¸å¯ç”¨! è¯·æŠŠ ffmpeg.exe æ”¾åˆ° tools\ ç›®å½•ä¸‹.
+    echo   [¾¯¸æ] Î´ÕÒµ½ %FFMPEG_EXE%
+    echo          ÏÂÔØ¹¦ÄÜ½«²»¿ÉÓÃ£¡ Çë°Ñ ffmpeg.exe ·Åµ½ tools Ä¿Â¼ÏÂ.
     echo.
     goto :ffmpeg_done
 )
@@ -77,22 +145,27 @@ echo.
 :ffmpeg_done
 
 REM ============================================================
-REM  [3/5] æ³¨å†Œ ffmpeg çŽ¯å¢ƒå˜é‡
-REM       æœåŠ¡ç”± NSSM ä»¥ LocalSystem èº«ä»½å¯åŠ¨, çœ‹ä¸åˆ°ç”¨æˆ·çº§ PATH,
-REM       æ‰€ä»¥æ—¢å†™ç³»ç»Ÿå˜é‡, åˆç»™æœåŠ¡å•ç‹¬è®¾ä¸€ä»½, åŒä¿é™©.
+REM  [3/6] ×¢²á ffmpeg »·¾³±äÁ¿
+REM  ·þÎñÓÉ NSSM ÒÔ LocalSystem Éí·ÝÆô¶¯£¬¿´²»µ½ÓÃ»§¼¶ PATH£¬
+REM  ËùÒÔ¼ÈÐ´ÏµÍ³±äÁ¿£¬ÓÖ¸ø·þÎñµ¥¶ÀÉèÒ»·Ý£¬Ë«±£ÏÕ¡£
 REM ============================================================
-echo [3/5] æ³¨å†Œ ffmpeg çŽ¯å¢ƒå˜é‡...
+echo [3/6] ×¢²á ffmpeg »·¾³±äÁ¿...
 
 if not exist "%FFMPEG_EXE%" (
-    echo   [è·³è¿‡] ffmpeg ä¸å­˜åœ¨
+    echo   [Ìø¹ý] ffmpeg ²»´æÔÚ
+    echo.
+    goto :env_done
+)
+if "%CHECK_ONLY%"=="1" (
+    echo   [Ìø¹ý] ¼ì²éÄ£Ê½
     echo.
     goto :env_done
 )
 
 setx /M FFMPEG_PATH "%FFMPEG_EXE%" >nul 2>&1
 if errorlevel 1 (
-    echo   [è­¦å‘Š] ç³»ç»ŸçŽ¯å¢ƒå˜é‡å†™å…¥å¤±è´¥, ä¸å½±å“æœåŠ¡è¿è¡Œ
-    echo          (æœåŠ¡å·²å•ç‹¬é…ç½® FFMPEG_PATH)
+    echo   [¾¯¸æ] ÏµÍ³»·¾³±äÁ¿Ð´ÈëÊ§°Ü, ²»Ó°Ïì·þÎñÔËÐÐ
+    echo          ·þÎñÒÑµ¥¶ÀÅäÖÃ FFMPEG_PATH
 ) else (
     echo   [OK] FFMPEG_PATH = %FFMPEG_EXE%
 )
@@ -101,21 +174,40 @@ echo.
 :env_done
 
 REM ============================================================
-REM  æ¸…ç†åŒåæ—§æœåŠ¡ï¼ˆä¿è¯é‡å¤æ‰§è¡Œå®‰å…¨ï¼‰
+REM  ¼ì²éÄ£Ê½µ½´Ë½áÊø
+REM ============================================================
+if "%CHECK_ONLY%"=="1" (
+    echo ============================================
+    echo   ¼ì²éÄ£Ê½ - Î´×öÈÎºÎÐÞ¸Ä
+    echo ============================================
+    echo   Node.js     : %NODE_VER%   [%NODE_SRC%]
+    echo   node.exe    : %NODE_EXE%
+    echo   npm         : %NPM_CMD%
+    echo   record-svc  : %REC_SCRIPT%
+    echo   ffmpeg      : %FFMPEG_EXE%
+    echo.
+    echo   È¥µô check ²ÎÊý¼´¿ÉÕýÊ½°²×°.
+    echo.
+    pause
+    exit /b 0
+)
+
+REM ============================================================
+REM  ÇåÀíÍ¬Ãû¾É·þÎñ£¬±£Ö¤ÖØ¸´Ö´ÐÐ°²È«
 REM ============================================================
 "%NSSM_EXE%" stop   %REC_SVC% >nul 2>&1
 "%NSSM_EXE%" remove %REC_SVC% confirm >nul 2>&1
 
 REM ============================================================
-REM  [4/5] æ³¨å†ŒæœåŠ¡
+REM  [4/6] ×¢²á·þÎñ
 REM ============================================================
-echo [4/5] æ³¨å†ŒæœåŠ¡...
+echo [4/6] ×¢²á·þÎñ...
 
 "%NSSM_EXE%" install %REC_SVC% "%NODE_EXE%"
 "%NSSM_EXE%" set %REC_SVC% AppParameters "\"%REC_SCRIPT%\""
 "%NSSM_EXE%" set %REC_SVC% AppDirectory  "%REC_DIR%"
-"%NSSM_EXE%" set %REC_SVC% DisplayName   "KE å½•åƒä¸‹è½½æœåŠ¡"
-"%NSSM_EXE%" set %REC_SVC% Description   "æ‘„åƒå¤´/NVR åŽ†å²å½•åƒä¸‹è½½, HTTP æŽ¥å£, ç«¯å£ %RECORD_PORT%"
+"%NSSM_EXE%" set %REC_SVC% DisplayName   "KE Â¼ÏñÏÂÔØ·þÎñ"
+"%NSSM_EXE%" set %REC_SVC% Description   "ÉãÏñÍ·/NVR ÀúÊ·Â¼ÏñÏÂÔØ, HTTP ½Ó¿Ú, ¶Ë¿Ú %RECORD_PORT%"
 "%NSSM_EXE%" set %REC_SVC% AppStdout     "%REC_DIR%\logs\stdout.log"
 "%NSSM_EXE%" set %REC_SVC% AppStderr     "%REC_DIR%\logs\stderr.log"
 "%NSSM_EXE%" set %REC_SVC% AppStdoutCreationDisposition 4
@@ -131,31 +223,56 @@ echo [4/5] æ³¨å†ŒæœåŠ¡...
 echo   [OK] %REC_SVC%
 echo.
 
+REM ---- web console ----
+echo [5/6] ×¢²áÍøÒ³µ÷ÊÔÌ¨·þÎñ %WEB_SVC% ...
+"%NSSM_EXE%" install %WEB_SVC% "%NODE_EXE%"
+"%NSSM_EXE%" set %WEB_SVC% AppParameters "\"%ROOT%\web\server.js\" --no-open"
+"%NSSM_EXE%" set %WEB_SVC% AppDirectory  "%ROOT%"
+"%NSSM_EXE%" set %WEB_SVC% DisplayName   "KE ÉãÏñÍ·µ÷ÊÔÌ¨"
+"%NSSM_EXE%" set %WEB_SVC% Description   "Camera debug console static web server, port 8080"
+"%NSSM_EXE%" set %WEB_SVC% AppStdout     "%ROOT%\web-console.log"
+"%NSSM_EXE%" set %WEB_SVC% AppStderr     "%ROOT%\web-console.log"
+"%NSSM_EXE%" set %WEB_SVC% AppStdoutCreationDisposition 4
+"%NSSM_EXE%" set %WEB_SVC% AppStderrCreationDisposition 4
+"%NSSM_EXE%" set %WEB_SVC% AppRotateFiles 1
+"%NSSM_EXE%" set %WEB_SVC% AppRotateBytes 10485760
+"%NSSM_EXE%" set %WEB_SVC% Start SERVICE_AUTO_START
+"%NSSM_EXE%" set %WEB_SVC% AppExit Default Restart
+"%NSSM_EXE%" set %WEB_SVC% AppRestartDelay 5000
+"%NSSM_EXE%" set %WEB_SVC% AppThrottle 5000
+echo   [OK] %WEB_SVC%
+echo.
+
+
 REM ============================================================
-REM  [5/5] å¯åŠ¨æœåŠ¡
+REM  [6/6] Æô¶¯·þÎñ
 REM ============================================================
-echo [5/5] å¯åŠ¨æœåŠ¡...
+echo [6/6] Æô¶¯·þÎñ...
 "%NSSM_EXE%" start %REC_SVC%
+"%NSSM_EXE%" start %WEB_SVC%
 echo.
 ping -n 5 127.0.0.1 >nul 2>&1
 
 echo ============================================
-echo   å®‰è£…å®Œæˆ
+echo   °²×°Íê³É
 echo ============================================
 "%NSSM_EXE%" status %REC_SVC%
+"%NSSM_EXE%" status %WEB_SVC%
 echo.
 echo ============================================
-echo   è®¿é—®åœ°å€
+echo   ·ÃÎÊµØÖ·
 echo ============================================
-echo   æœåŠ¡é¦–é¡µ   : http://localhost:%RECORD_PORT%
-echo   å¥åº·æ£€æŸ¥   : http://localhost:%RECORD_PORT%/health
-echo   æˆå“ç›®å½•   : %REC_DIR%\downloads
+echo   µ÷ÊÔÌ¨     : http://localhost:8080
+echo   ·þÎñÊ×Ò³   : http://localhost:%RECORD_PORT%
+echo   ½¡¿µ¼ì²é   : http://localhost:%RECORD_PORT%/health
+echo   ³ÉÆ·Ä¿Â¼   : %REC_DIR%\downloads
 echo.
-echo   æç¤º: å±€åŸŸç½‘å…¶å®ƒæœºå™¨è®¿é—®ä¸äº†, è¯·ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ
-echo         firewall-rules.bat æ”¾è¡Œ %RECORD_PORT% ç«¯å£.
+echo   ÌáÊ¾: ¾ÖÓòÍøÆäËü»úÆ÷·ÃÎÊ²»ÁË, ÇëÒÔ¹ÜÀíÔ±Éí·ÝÔËÐÐ
+echo         firewall-rules.bat ·ÅÐÐ %RECORD_PORT% ¶Ë¿Ú.
 echo.
-echo   ç®¡ç†å‘½ä»¤:
+echo   ¹ÜÀíÃüÁî:
 echo     nssm restart %REC_SVC%
+echo     nssm restart %WEB_SVC%
 echo     nssm stop    %REC_SVC%
 echo     nssm start   %REC_SVC%
 echo.
